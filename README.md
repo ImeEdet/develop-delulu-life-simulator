@@ -67,8 +67,11 @@ consistency, depth and reliable saving.
 - Installable **PWA**: web manifest, service worker with offline app-shell
   caching (build-stamped cache versions), PNG + SVG icons, apple-touch icon,
   safe-area insets for notched phones, mobile-first responsive layout.
-- Dependency-free automated tests (40 cases) including seeded 100-year
-  simulations across every country, plus the original headless smoke test.
+- Dependency-free automated tests (47 cases) including seeded 100-year
+  simulations across every country, a four-generation save/reload family-saga
+  test (family tree, deceased relatives, surnames, finances and relationships
+  verified across persistence), React SSR render checks, and the original
+  headless smoke test.
 - Repository cleaned: `node_modules/` untracked, proper `.gitignore`.
 
 ---

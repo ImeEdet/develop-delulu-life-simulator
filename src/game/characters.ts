@@ -240,7 +240,12 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
     const age = clamp(ps.age, 16, maxAge);
     const par = mkChar(s, {
       firstName: customOrGenerated(ps.firstName, c.id, gender, groupId, usage),
-      lastName: spec.parentStatus === "together" ? familySurname : makeSurname(c.id, gender, groupId, usage),
+      // The mother always carries the family name so children inherit it
+      // consistently; an apart father keeps his own independent surname.
+      lastName:
+        kind === "mother" || spec.parentStatus === "together"
+          ? familySurname
+          : makeSurname(c.id, gender, groupId, usage),
       group: groupId,
       gender,
       age,
@@ -266,10 +271,13 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
   if (mother) {
     mother.partnerId = together ? father!.id : undefined;
     player.motherId = mother.id;
+    // The player is their child too — keep the tree symmetric, not just siblings.
+    if (!mother.childrenIds.includes(player.id)) mother.childrenIds.push(player.id);
   }
   if (father) {
     father.partnerId = together ? mother!.id : undefined;
     player.fatherId = father.id;
+    if (!father.childrenIds.includes(player.id)) father.childrenIds.push(player.id);
   }
 
   const sibs = spec.siblings.slice(0, 4);
@@ -369,10 +377,10 @@ export function createChild(s: GameState, mother: Char, father: Char, originCoun
     birthYear: s.worldYear,
     countryId: mother.countryId,
     city: mother.city,
-    // The outsider to a deeper lineage "marries in": a child's generation is
-    // one above the shallower parent so the player's direct lineage stays
-    // player+1 even when the other parent comes from a newer NPC family.
-    generation: Math.min(mother.generation, father.generation) + 1,
+    // Genealogical depth: a child belongs one generation below the deeper of
+    // the two parental lines. Outsiders created as partners are gen 1, so the
+    // player's own children are always player+1.
+    generation: Math.max(mother.generation, father.generation) + 1,
     motherId: mother.id,
     fatherId: father.id,
     wealthTier: mother.wealthTier,
@@ -387,8 +395,8 @@ export function createChild(s: GameState, mother: Char, father: Char, originCoun
     child.languages[origin.languages[0]] = 60;
     child.flags.push("adopted");
   }
-  mother.childrenIds.push(child.id);
-  father.childrenIds.push(child.id);
+  if (!mother.childrenIds.includes(child.id)) mother.childrenIds.push(child.id);
+  if (father !== mother && !father.childrenIds.includes(child.id)) father.childrenIds.push(child.id);
   return child;
 }
 

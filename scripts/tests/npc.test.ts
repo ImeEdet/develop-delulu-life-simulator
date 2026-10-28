@@ -72,13 +72,38 @@ export const tests = [
         for (const kidId of c.childrenIds) {
           const kid = s.chars[kidId];
           assert(kid, "dangling child ref");
-          assert(kid.age <= c.age - 12, `child ${kid.age} too close to parent age ${c.age}`);
+          // birth years are immutable; compare those rather than living ages
+          // (a deceased parent stays frozen at their age at death)
+          assert(c.birthYear <= kid.birthYear - 12, `child ${kid.firstName} born too close to parent ${c.firstName}`);
         }
       }
       if (p.childrenIds.length) {
         const kid = s.chars[p.childrenIds[0]];
-        assertEqual(kid.generation, p.generation + 1, "generation not incremented");
+        const otherParent = kid.motherId === p.id ? s.chars[kid.fatherId ?? ""] : s.chars[kid.motherId ?? ""];
+        const expected = Math.max(p.generation, otherParent?.generation ?? p.generation) + 1;
+        assertEqual(kid.generation, expected, "generation not one below the deeper parent");
         void kid;
+      }
+    },
+  },
+  {
+    name: "regression: the player is registered in both parents' child lists at birth",
+    fn: () => {
+      for (let seed = 1; seed <= 30; seed++) {
+        const s = freshLife(seed);
+        const p = s.chars[s.currentId];
+        const mum = p.motherId ? s.chars[p.motherId] : undefined;
+        const dad = p.fatherId ? s.chars[p.fatherId] : undefined;
+        if (mum) assert(mum.childrenIds.includes(p.id), `seed ${seed}: mother does not list the player`);
+        if (dad) assert(dad.childrenIds.includes(p.id), `seed ${seed}: father does not list the player`);
+        // every parent-child link in the starting family is symmetric
+        for (const c of Object.values(s.chars)) {
+          for (const kidId of c.childrenIds) {
+            const kid = s.chars[kidId];
+            assert(kid, `seed ${seed}: dangling child id`);
+            assert(kid.motherId === c.id || kid.fatherId === c.id, `seed ${seed}: asymmetric link for ${kid.firstName}`);
+          }
+        }
       }
     },
   },

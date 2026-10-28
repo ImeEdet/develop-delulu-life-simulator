@@ -18,6 +18,7 @@ const modules = [
   "./tests/economy.test.ts",
   "./tests/npc.test.ts",
   "./tests/persistence.test.ts",
+  "./tests/generations.test.ts",
   "./tests/longlife.test.ts",
   "./tests/render.test.ts",
 ];

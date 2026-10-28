@@ -118,4 +118,18 @@ export const tests = [
       assert(rendered.includes(p.firstName) && rendered.includes(p.lastName), "full name missing parts");
     },
   },
+  {
+    name: "regression: every child (incl. separated-parent families) takes the mother's surname",
+    fn: () => {
+      for (let seed = 1; seed <= 30; seed++) {
+        const s = freshLife(seed);
+        for (const c of Object.values(s.chars)) {
+          if (!c.motherId) continue;
+          const mum = s.chars[c.motherId];
+          assert(!!mum, `seed ${seed}: ${c.firstName} has a dangling mother`);
+          assertEqual(c.lastName, mum.lastName, `seed ${seed}: ${c.firstName} did not inherit the mother's surname`);
+        }
+      }
+    },
+  },
 ];
