@@ -23,6 +23,7 @@ const modules = [
   "./tests/render.test.ts",
   "./tests/social.test.ts",
   "./tests/v29.test.ts",
+  "./tests/superlife.test.ts",
 ];
 
 // Keep bundles inside the project so externally-resolved node_modules work.

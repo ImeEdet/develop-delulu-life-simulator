@@ -128,7 +128,60 @@ export interface FameCareer {
   awards: string[];
 }
 
-export type ThemePreference = "auto" | "classic" | "gold";
+export type ThemePreference = "auto" | "classic" | "gold" | "super";
+export type WorldType = "ordinary" | "superlife";
+export type SuperOriginChoice = "born" | "acquired" | "random";
+export type SuperOrigin = "innate" | "acquired";
+export type SuperAlignment = "hero" | "villain" | "neutral";
+export type SuperFamilyBackground = "super-dynasty" | "super-family" | "first-generation" | "ordinary" | "unknown" | "random";
+export type SuperLegalStatus = "clear" | "wanted";
+
+export interface SuperPowerState {
+  powerId: string;
+  origin: SuperOrigin;
+  active: boolean;
+  mastery: number;
+  control: number;
+  experience: number;
+  energy: number;
+  acquiredYear?: number;
+  lastTrainedYear?: number;
+}
+
+export interface SuperProfile {
+  originChoice: SuperOriginChoice;
+  origin: SuperOrigin;
+  familyBackground: Exclude<SuperFamilyBackground, "random">;
+  manifestationAge: number;
+  plannedPowerId?: string;
+  awakeningPending?: boolean;
+  powers: SuperPowerState[];
+  alignment: SuperAlignment;
+  inclination: SuperAlignment;
+  alias?: string;
+  aliasHistory: string[];
+  identityPublic: boolean;
+  identityExposed: boolean;
+  publicReputation: number;
+  legalStatus: SuperLegalStatus;
+  organizationIds: string[];
+  organizationHistory: string[];
+}
+
+export interface SuperLifeOptions {
+  originChoice: SuperOriginChoice;
+  manifestationAge: number;
+  powerId?: string;
+  startWithPower: boolean;
+  alignment: SuperAlignment | "random";
+  familyBackground: SuperFamilyBackground;
+  alias?: string;
+  identityPublic: boolean;
+}
+
+export interface SuperLifeSpec extends CustomSpec {
+  superLife: SuperLifeOptions;
+}
 
 export interface Char {
   id: string;
@@ -192,6 +245,7 @@ export interface Char {
   /** Per-skill learning multipliers, rolled only when a character begins that skill. */
   aptitudes?: Record<string, number>;
   sportsCareer?: SportCareer;
+  superProfile?: SuperProfile;
   fame?: number;
   reputation?: number;
   fameCareer?: FameCareer;
@@ -234,6 +288,8 @@ export interface Toast {
 
 export interface GameState {
   version: number;
+  /** Missing/undefined legacy values are treated as the ordinary simulator world. */
+  worldType?: WorldType;
   seed?: number;
   startYear: number;
   worldYear: number;

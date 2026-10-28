@@ -6,9 +6,10 @@ import type { GameState, SaveEnvelope, SaveMeta, SaveSlot } from "../types";
 import { COUNTRIES } from "../world";
 import { emptyNameUsage } from "../names";
 import { legacyGroupId } from "../names";
+import { POWER_BY_ID } from "../super";
 import type { StorageDriver } from "./storage";
 
-export const CURRENT_SCHEMA = 2;
+export const CURRENT_SCHEMA = 3;
 const SLOT_PREFIX = "slot:";
 export const AUTOSAVE_ID = "autosave";
 const LEGACY_KEY = "delulu-life-save-v1";
@@ -44,7 +45,7 @@ export function migrate(raw: unknown): { state: GameState; errors: string[] } {
     return { state: null as never, errors: ["Save is not an object."] };
   }
   const d = raw as Record<string, unknown>;
-  if (typeof d.version !== "number" || (d.version !== 1 && d.version !== 2)) {
+  if (typeof d.version !== "number" || ![1, 2, 3].includes(d.version)) {
     return { state: null as never, errors: [`Unsupported save version: ${String(d.version)}.`] };
   }
   if (typeof d.seq !== "number" || typeof d.worldYear !== "number" || typeof d.chars !== "object" || d.chars === null) {
@@ -54,10 +55,11 @@ export function migrate(raw: unknown): { state: GameState; errors: string[] } {
   if (!state.chars[state.currentId]) {
     return { state: null as never, errors: ["Current character is missing from the save."] };
   }
-  // ---- V1 -> V2 structural migration
+  // ---- V1/V2 -> V3 structural migration
   state.version = CURRENT_SCHEMA;
+  state.worldType = state.worldType === "superlife" ? "superlife" : "ordinary";
   state.nameUsage = state.nameUsage ?? emptyNameUsage();
-  if (state.themePreference !== "auto" && state.themePreference !== "classic" && state.themePreference !== "gold") state.themePreference = "auto";
+  if (state.themePreference !== "auto" && state.themePreference !== "classic" && state.themePreference !== "gold" && state.themePreference !== "super") state.themePreference = "auto";
   if (!Array.isArray(state.log)) state.log = [];
   if (!Array.isArray(state.pending)) state.pending = [];
   for (const c of Object.values(state.chars)) {
@@ -87,6 +89,36 @@ export function migrate(raw: unknown): { state: GameState; errors: string[] } {
     c.birthCity = typeof c.birthCity === "string" && c.birthCity ? c.birthCity : c.city;
     c.citizenships = Array.isArray(c.citizenships) ? c.citizenships.filter((id): id is string => typeof id === "string" && !!COUNTRIES[id]) : [];
     if (c.citizenships.length === 0) c.citizenships = [c.citizenOf ?? c.countryId];
+    if (state.worldType !== "superlife") {
+      // Older saves are ordinary lives; never infer Super Life from a name or a stray field.
+      c.superProfile = undefined;
+    } else if (c.superProfile) {
+      const profile = c.superProfile;
+      if (!["born", "acquired", "random"].includes(profile.originChoice)) profile.originChoice = "born";
+      if (profile.origin !== "innate" && profile.origin !== "acquired") profile.origin = "innate";
+      if (!["super-dynasty", "super-family", "first-generation", "ordinary", "unknown"].includes(profile.familyBackground)) profile.familyBackground = "ordinary";
+      if (!["hero", "villain", "neutral"].includes(profile.alignment)) profile.alignment = "neutral";
+      if (!["hero", "villain", "neutral"].includes(profile.inclination)) profile.inclination = profile.alignment;
+      profile.manifestationAge = typeof profile.manifestationAge === "number" && Number.isFinite(profile.manifestationAge) ? Math.max(0, Math.min(115, profile.manifestationAge)) : 0;
+      profile.plannedPowerId = typeof profile.plannedPowerId === "string" && POWER_BY_ID[profile.plannedPowerId] ? profile.plannedPowerId : undefined;
+      profile.powers = Array.isArray(profile.powers) ? profile.powers.filter((power) => power && typeof power.powerId === "string" && !!POWER_BY_ID[power.powerId] && (power.origin === "innate" || power.origin === "acquired")).map((power) => ({
+        ...power,
+        active: !!power.active,
+        mastery: typeof power.mastery === "number" && Number.isFinite(power.mastery) ? Math.max(0, Math.min(100, power.mastery)) : 0,
+        control: typeof power.control === "number" && Number.isFinite(power.control) ? Math.max(0, Math.min(100, power.control)) : 0,
+        experience: typeof power.experience === "number" && Number.isFinite(power.experience) ? Math.max(0, power.experience) : 0,
+        energy: typeof power.energy === "number" && Number.isFinite(power.energy) ? Math.max(0, Math.min(100, power.energy)) : 100,
+      })) : [];
+      profile.alias = typeof profile.alias === "string" && profile.alias.trim() ? profile.alias.slice(0, 32) : undefined;
+      profile.aliasHistory = Array.isArray(profile.aliasHistory) ? profile.aliasHistory.filter((alias): alias is string => typeof alias === "string").slice(-20) : [];
+      profile.identityPublic = !!profile.identityPublic;
+      profile.identityExposed = !!profile.identityExposed;
+      profile.publicReputation = typeof profile.publicReputation === "number" && Number.isFinite(profile.publicReputation) ? Math.max(-100, Math.min(100, profile.publicReputation)) : 0;
+      if (profile.legalStatus !== "clear" && profile.legalStatus !== "wanted") profile.legalStatus = "clear";
+      profile.organizationIds = Array.isArray(profile.organizationIds) ? profile.organizationIds.filter((id): id is string => typeof id === "string") : [];
+      profile.organizationHistory = Array.isArray(profile.organizationHistory) ? profile.organizationHistory.filter((id): id is string => typeof id === "string") : [];
+      profile.awakeningPending = !!profile.awakeningPending;
+    }
     c.fame = typeof c.fame === "number" && Number.isFinite(c.fame) ? Math.max(0, Math.min(100, c.fame)) : 0;
     c.reputation = typeof c.reputation === "number" && Number.isFinite(c.reputation) ? Math.max(0, Math.min(100, c.reputation)) : 50;
     if (c.sportsCareer && typeof c.sportsCareer === "object" && typeof c.sportsCareer.sportId === "string") {

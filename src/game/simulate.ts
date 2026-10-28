@@ -15,6 +15,7 @@ import { EVENTS, makeCtx, runEvent } from "./events";
 import { advanceCharacterSkills } from "./skills";
 import { advanceSportCareer } from "./sports";
 import { advanceFame } from "./fame";
+import { advanceSuperNpc, queueSuperAwakening } from "./super";
 
 function L(s: GameState, age: number, kind: LogKind, text: string) {
   s.log.push({ id: s.seq++, year: s.worldYear, age, text, kind });
@@ -329,6 +330,7 @@ function simulateNpcs(s: GameState, p: Char, Lf: (k: LogKind, t: string) => void
   for (const c of Object.values(s.chars)) {
     if (c.id === p.id || !c.alive) continue;
     c.age++;
+    advanceSuperNpc(s, c, false);
     if (c.age > 55) c.health = clamp(c.health - (0.4 + (c.age - 55) * 0.06));
     c.happiness = clamp(c.happiness + (c.happiness < 55 ? 0.8 : -0.4));
     npcEducation(s, c, notes);
@@ -740,6 +742,7 @@ export function ageUp(s: GameState): void {
   s.worldYear++;
   p.age++;
   p.usedActions = [];
+  advanceSuperNpc(s, p, true);
   const Lf = (k: LogKind, t: string) => L(s, p.age, k, t);
   simulateNpcs(s, p, Lf);
   if (!p.alive) return;
@@ -747,6 +750,7 @@ export function ageUp(s: GameState): void {
   advanceSportCareer(s, p, false);
   advanceFame(s, p, false);
   milestones(s, p, Lf);
+  if (s.pending.length === 0) queueSuperAwakening(s, p);
   fireRandom(s, p);
   settle(s, p, Lf);
   drift(s, p);

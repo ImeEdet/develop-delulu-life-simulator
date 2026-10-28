@@ -7,6 +7,7 @@ import { Game } from "../../src/components/Game";
 import { UpdateBanner } from "../../src/components/UpdateBanner";
 import { setSeed } from "../../src/game/rng";
 import { newRandomLife } from "../../src/game/characters";
+import { hasWaitingUpdate } from "../../src/game/useAppUpdate";
 import type { GameApi } from "../../src/game/state";
 import { assert } from "./util";
 
@@ -81,6 +82,17 @@ export const tests = [
       const html = renderToString(React.createElement(UpdateBanner, { updating: false, onUpdate: () => {} }));
       assert(html.includes('role="status"') && html.includes("A new Delulu Life update is ready."), "update notice missing");
       assert(html.includes("Update &amp; restart"), "restart action is not visible");
+    },
+  },
+  {
+    name: "a waiting worker is offered even before the current page has a controller",
+    fn: () => {
+      assert(hasWaitingUpdate({ waiting: {} as ServiceWorker }), "waiting update was hidden without a page controller");
+      assert(!hasWaitingUpdate({ waiting: null }), "empty registration incorrectly shows an update");
+      const hook = readFileSync("src/game/useAppUpdate.ts", "utf8");
+      assert(hook.includes('window.addEventListener("pageshow", checkForUpdate)'), "page restore does not check for updates");
+      assert(hook.includes('window.addEventListener("online", checkForUpdate)'), "coming online does not check for updates");
+      assert(hook.includes("15 * 60 * 1000"), "update polling interval is missing or too long");
     },
   },
   {

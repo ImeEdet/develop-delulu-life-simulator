@@ -267,3 +267,52 @@ nav::-webkit-scrollbar {
   50% { box-shadow: 0 10px 42px rgba(240, 195, 107, 0.38), 0 0 24px rgba(221, 169, 91, 0.2); }
 }
 .theme-gold .btn-ghost:hover:not(:disabled) { border-color: #b28b4d; }
+
+/* Super Life: electric-blue accents over midnight navy. */
+.theme-super {
+  --color-ink: #071321;
+  --color-ink2: #0b1b2e;
+  --color-ink3: #10263d;
+  --color-ink4: #193956;
+  --color-line: #234a68;
+  --color-txt: #e7f6ff;
+  --color-dim: #9bb8cb;
+  --color-pink: #4dd8ff;
+  --color-peach: #39b8ff;
+  --color-mint: #52e6c2;
+  --color-lav: #75aaff;
+  --color-coral: #ff7d86;
+  --color-gold: #a8dcff;
+}
+.theme-super.bg-dusk {
+  background:
+    radial-gradient(1000px 650px at 88% -10%, rgba(31, 151, 255, 0.2), transparent 62%),
+    radial-gradient(900px 700px at -12% 35%, rgba(36, 230, 220, 0.1), transparent 58%),
+    radial-gradient(1000px 900px at 50% 115%, rgba(33, 91, 161, 0.18), transparent 62%);
+}
+.theme-super .stars {
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%, rgba(190, 232, 255, 0.55) 50%, transparent 51%),
+    radial-gradient(1px 1px at 28% 68%, rgba(65, 190, 255, 0.42) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 42% 12%, rgba(155, 220, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 58% 42%, rgba(105, 208, 255, 0.35) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 71% 18%, rgba(61, 174, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 84% 58%, rgba(190, 232, 255, 0.45) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 8% 84%, rgba(99, 212, 255, 0.45) 50%, transparent 51%);
+}
+.theme-super .panel-inset { background: rgba(11, 27, 46, 0.8); }
+.theme-super .btn-primary {
+  background: linear-gradient(135deg, #43c8ff, #2388f5);
+  color: #031324;
+  box-shadow: 0 6px 24px rgba(35, 136, 245, 0.28);
+}
+.theme-super .anim-glow { animation-name: super-glowpulse; }
+@keyframes super-glowpulse {
+  0%, 100% { box-shadow: 0 6px 28px rgba(35, 136, 245, 0.25), 0 0 0 rgba(67, 200, 255, 0); }
+  50% { box-shadow: 0 10px 42px rgba(67, 200, 255, 0.38), 0 0 25px rgba(35, 136, 245, 0.22); }
+}
+.theme-super .btn-ghost:hover:not(:disabled) { border-color: #3caeff; }
+.theme-super .bg-peach { background-color: #39b8ff; }
+.theme-super .text-peach { color: #58c9ff; }
+.theme-super .border-peach { border-color: #39b8ff; }
+.theme-super .text-gold { color: #a8dcff; }
