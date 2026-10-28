@@ -78,7 +78,7 @@ export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
           </div>
         )}
 
-        {screen === "random" && <RandomFlow g={g} onBack={() => setScreen("menu")} onBegin={() => { g.startRandom(); onPlay(); }} />}
+        {screen === "random" && <RandomFlow onBack={() => setScreen("menu")} onBegin={(spec) => { g.startCustom(spec); onPlay(); }} />}
 
         {screen === "custom" && (
           <CustomFlow
@@ -114,8 +114,7 @@ export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
   );
 }
 
-function RandomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void; onBegin: () => void }) {
-  void _g;
+function RandomFlow({ onBack, onBegin }: { onBack: () => void; onBegin: (spec: CustomSpec) => void }) {
   const [spec, setSpec] = useState<CustomSpec>(() => buildRandomSpec());
   const c = country(spec.countryId);
   const group = NAME_GROUPS[spec.group ?? c.groups[0]];
@@ -155,7 +154,7 @@ function RandomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
         <button className="btn-ghost rounded-xl px-5 py-3.5 font-bold" onClick={onBack}>Back</button>
         <button className="btn-ghost rounded-xl px-5 py-3.5 font-bold" onClick={() => setSpec(buildRandomSpec())}>Roll Again</button>
       </div>
-      <button className="btn-primary rounded-xl px-5 py-4 w-full mt-3 font-bold text-lg" onClick={onBegin}>
+      <button className="btn-primary rounded-xl px-5 py-4 w-full mt-3 font-bold text-lg" onClick={() => onBegin(spec)}>
         Begin This Life
       </button>
     </div>

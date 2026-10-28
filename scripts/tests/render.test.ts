@@ -68,6 +68,14 @@ export const tests = [
     },
   },
   {
+    name: "random-life flow starts the exact character shown in its preview",
+    fn: () => {
+      const menu = readFileSync("src/components/Menu.tsx", "utf8");
+      assert(menu.includes("onBegin={(spec) => { g.startCustom(spec); onPlay(); }}"), "random preview spec is not passed into life creation");
+      assert(menu.includes("onClick={() => onBegin(spec)}"), "begin button does not submit the currently displayed spec");
+    },
+  },
+  {
     name: "service-worker update prompt shows an accessible restart button only when rendered",
     fn: () => {
       const html = renderToString(React.createElement(UpdateBanner, { updating: false, onUpdate: () => {} }));
