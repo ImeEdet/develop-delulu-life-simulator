@@ -21,7 +21,10 @@ export function actionLock(s: GameState, id: string): string | null {
   if (!def) return null;
   if (def.minAge && p.age < def.minAge) return `Available from age ${def.minAge}.`;
   if (def.maxAge && p.age > def.maxAge) return "Past this chapter.";
-  if (def.cost && p.money < def.cost && p.age >= 18) return `Needs ${fmtMoney(def.cost, p.countryId)}.`;
+  if (def.cost && p.age >= 18) {
+    const need = nominal(def.cost, s.worldYear);
+    if (p.money < need) return `Needs ${fmtMoney(need, p.countryId)}.`;
+  }
   if (def.lock) {
     const r = def.lock(p);
     if (r) return r;
@@ -59,6 +62,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
   const p = s.chars[s.currentId];
   if (!p.alive || s.over) return;
   if (id !== "apply" && actionLock(s, id)) return;
+  const moneyBefore = p.money;
 
   switch (id) {
     case "exercise":
@@ -90,7 +94,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       break;
     }
     case "party":
-      p.money -= 150;
+      p.money -= nominal(150, s.worldYear);
       p.happiness = clamp(p.happiness + 7);
       p.health = clamp(p.health - 2);
       if (chance(0.2)) {
@@ -101,25 +105,25 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       }
       break;
     case "invest": {
-      p.money -= 10000;
+      p.money -= nominal(10000, s.worldYear);
       const r = random();
       if (r < 0.55) {
-        p.money += 12000;
+        p.money += nominal(12000, s.worldYear);
         L(s, p, "money", "Your investment grew 12%. It worked the year you weren't watching, like all good employees.");
-        toast(s, "+$12K. The money worked.");
+        toast(s, "+20%. The money worked.");
       } else if (r < 0.8) {
-        p.money += 12500;
+        p.money += nominal(12500, s.worldYear);
         L(s, p, "money", "Your investment surprised everyone, including its lawyers: +25%.");
-        toast(s, "+$25K. Unreasonably good.");
+        toast(s, "+25%. Unreasonably good.");
       } else {
-        p.money -= 3000;
+        p.money -= nominal(3000, s.worldYear);
         L(s, p, "money", "Your investment shrank 30%. The charts are just a picture, the picture is just a memory.");
-        toast(s, "-$3K. Charts are just pictures.");
+        toast(s, "-30%. Charts are just pictures.");
       }
       break;
     }
     case "lottery": {
-      p.money -= 20;
+      p.money -= nominal(20, s.worldYear);
       const r = random();
       if (r < 0.002) {
         const win = nominal(100000, s.worldYear);
@@ -128,7 +132,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
         L(s, p, "milestone", "The lottery numbers matched. All of them. Check the ticket again. Do it.");
         toast(s, "THE NUMBERS MATCHED.");
       } else if (r < 0.06) {
-        p.money += 40;
+        p.money += nominal(40, s.worldYear);
         L(s, p, "good", "The lottery paid out $40. Small, loud, personal.");
       } else {
         L(s, p, "neutral", "The lottery numbers came in. They were not your numbers. They were everyone else's numbers.");
@@ -164,13 +168,13 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       break;
     }
     case "vacation": {
-      p.money -= 3000;
+      p.money -= nominal(3000, s.worldYear);
       p.happiness = clamp(p.happiness + 9);
       L(s, p, "good", "You took a vacation. You came back quieter, and somehow louder inside.");
       break;
     }
     case "gift": {
-      p.money -= 200;
+      p.money -= nominal(200, s.worldYear);
       const kidId = p.childrenIds[0];
       const kid = s.chars[kidId];
       if (kid) {
@@ -260,7 +264,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
     }
     case "adopt": {
       if (random() < 0.6) {
-        p.money -= 8000;
+        p.money -= nominal(8000, s.worldYear);
         const origin = pick(COUNTRY_LIST.filter((c) => c.id !== p.countryId));
         const par = s.chars[p.partnerId ?? ""];
         const mother = p.gender === "female" ? p : par ?? p;
@@ -372,7 +376,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
     case "emigrate": {
       const dest = opt ? country(opt) : undefined;
       if (!dest || dest.id === p.countryId) break;
-      p.money -= 12000;
+      p.money -= nominal(12000, s.worldYear);
       const move = [p, s.chars[p.partnerId ?? ""], ...p.childrenIds.map((i) => s.chars[i])].filter((x): x is Char => !!x && x.alive);
       for (const m of move) {
         m.countryId = dest.id;
@@ -393,6 +397,9 @@ export function doAction(s: GameState, id: string, opt?: string): void {
     default:
       break;
   }
+  // Whole-dollar wallets that can never go negative, even if an action cost
+  // was set without a matching actionLock entry.
+  if (p.money !== moneyBefore) p.money = Math.max(0, Math.round(p.money));
   markUsed(p, id === "apply" ? "jobhunt" : id);
 }
 

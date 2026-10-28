@@ -3,7 +3,7 @@ import type { GameState } from "../game/types";
 import { COUNTRY_LIST, LANGS, LANG_LIST, country, fmtMoney } from "../game/world";
 import { ACTIONS, TRAIT_LIST } from "../game/content";
 import { actionLock } from "../game/actions";
-import { netWorth } from "../game/economy";
+import { netWorth, nominal } from "../game/economy";
 import type { GameApi } from "../game/state";
 import { Chip, CountryTag, I, LangBar, Modal, Portrait, SectionTitle } from "./ui";
 
@@ -42,9 +42,14 @@ export function ActionsScreen({ s, g }: { s: GameState; g: GameApi }) {
                         </span>
                         {a.name}
                       </span>
-                      {a.opt && (
-                        <Chip color="peach">{a.opt.label}</Chip>
-                      )}
+                      <span className="flex items-center gap-1 shrink-0">
+                        {a.cost && (
+                          <Chip color="gold">{fmtMoney(nominal(a.cost, s.worldYear), p.countryId)}</Chip>
+                        )}
+                        {a.opt && (
+                          <Chip color="peach">{a.opt.label}</Chip>
+                        )}
+                      </span>
                     </div>
                     <p className="text-[11px] text-dim mt-1 leading-snug">
                       {used ? "Done this year." : lock ?? a.desc}

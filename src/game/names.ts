@@ -44,8 +44,10 @@ export function pickGroup(countryId: string): NameGroup {
 
 function candidatesFor(group: NameGroup, gender: Gender): string[] {
   const gendered = gender === "male" ? group.male : group.female;
-  // Unisex names are genuinely shared: fold them into both pools.
-  return [...gendered, ...group.unisex];
+  // A name declared unisex is never treated as gender-locked, even if an
+  // older dataset also listed it on a gendered side.
+  const strictlyGendered = gendered.filter((n) => !group.unisex.includes(n));
+  return [...strictlyGendered, ...group.unisex];
 }
 
 function remember(usage: NameUsage | undefined, key: string, bucket: "first" | "last", name: string) {

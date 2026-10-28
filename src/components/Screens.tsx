@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { Char, GameState } from "../game/types";
 import { country, fmtMoney, LANGS } from "../game/world";
 import { JOBS, MAJOR_LIST, SENIORITY, TRAIT_LIST, eligibleJobs, isImmigrant, jobSalary } from "../game/content";
-import { livingCost, netWorth, totalDebt } from "../game/economy";
+import { livingCost, netWorth, totalDebt, financialStatus } from "../game/economy";
+import { nominal } from "../game/era";
 import { actionLock } from "../game/actions";
 import type { GameApi } from "../game/state";
 import { Chip, CountryTag, I, Portrait, SectionTitle } from "./ui";
@@ -296,7 +297,7 @@ export function WorkScreen({ s, g }: { s: GameState; g: GameApi }) {
                 <div key={j.id} className={`panel-inset p-3 ${p.job?.jobId === j.id ? "border-lav/50" : ""}`}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-bold text-sm">{j.title}</p>
-                    <Chip color="gold">{fmtMoney(jobSalary(j, p, 0), p.countryId)}/yr</Chip>
+                    <Chip color="gold">{fmtMoney(nominal(jobSalary(j, p, 0), s.worldYear), p.countryId)}/yr</Chip>
                   </div>
                   <p className="text-xs text-dim mt-1">{j.desc}</p>
                   <div className="flex flex-wrap gap-1 mt-2">
@@ -337,10 +338,10 @@ export function MoneyScreen({ s, g }: { s: GameState; g: GameApi }) {
   const net = netWorth(p);
   const debt = totalDebt(p);
   const purchases: { id: string; name: string; icon: string; note: string }[] = [
-    { id: "house", name: "Buy a house", icon: "home", note: `≈ ${fmtMoney(Math.round(160000 * country(p.countryId).costIndex), p.countryId)}, 30% down` },
-    { id: "car", name: "Buy a car", icon: "car", note: "freedom, four wheels" },
-    { id: "vacation", name: "Vacation", icon: "plane", note: "you, a plane, a beach" },
-    { id: "invest", name: "Invest $10K", icon: "wallet", note: "money at work" },
+    { id: "house", name: "Buy a house", icon: "home", note: `≈ ${fmtMoney(nominal(Math.round(160000 * country(p.countryId).costIndex), s.worldYear), p.countryId)}, 30% down` },
+    { id: "car", name: "Buy a car", icon: "car", note: `≈ ${fmtMoney(nominal(28000, s.worldYear), p.countryId)}, four wheels` },
+    { id: "vacation", name: "Vacation", icon: "plane", note: `≈ ${fmtMoney(nominal(3000, s.worldYear), p.countryId)}, you, a plane, a beach` },
+    { id: "invest", name: "Invest $10K", icon: "wallet", note: `≈ ${fmtMoney(nominal(10000, s.worldYear), p.countryId)} at work` },
     { id: "lottery", name: "Lottery ticket", icon: "dice", note: "a realistic dream" },
     { id: "gift", name: "Gift for a child", icon: "gift", note: "one more toy" },
   ];
@@ -366,6 +367,7 @@ export function MoneyScreen({ s, g }: { s: GameState; g: GameApi }) {
               <div className="text-right">
                 <p className="text-[11px] font-extrabold uppercase tracking-wider text-dim">Net worth</p>
                 <p className={`font-display font-bold text-xl ${net < 0 ? "text-coral" : "text-mint"}`}>{fmtMoney(net, p.countryId)}</p>
+                <p className="text-[10px] font-bold text-peach capitalize">{financialStatus(p, s.worldYear)}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">

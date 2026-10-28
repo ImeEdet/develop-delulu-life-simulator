@@ -152,9 +152,9 @@ export const ACTIONS: ActionDef[] = [
   { id: "socialize", name: "See Friends", desc: "Coffee, gossip, and one shared playlist.", icon: "users", group: "Everyday", minAge: 10, lock: (p) => (p.friends.length === 0 ? "No one to hang out with yet." : null) },
   { id: "party", name: "Throw a Party", desc: "Speakers up. Dignity negotiable.", icon: "spark", group: "Everyday", minAge: 16, cost: 150 },
 
-  { id: "invest", name: "Invest $10K", desc: "Put money to work. It sometimes works back.", icon: "wallet", group: "Money", minAge: 20, cost: 10000, lock: (p) => (p.money < 10000 ? "You need $10K to spare." : null) },
+  { id: "invest", name: "Invest $10K", desc: "Put money to work. It sometimes works back.", icon: "wallet", group: "Money", minAge: 20, cost: 10000, lock: (p) => eraLock(p, 10000, "to spare") },
   { id: "lottery", name: "Lottery Ticket", desc: "A realistic plan to be unrealistic.", icon: "dice", group: "Money", minAge: 18, cost: 20 },
-  { id: "car", name: "Buy a Car", desc: "Freedom, four wheels, one exhaust note.", icon: "car", group: "Money", minAge: 18, cost: 28000, lock: (p) => (p.car ? "You already own a car." : p.money < 28000 ? "You need $28K." : null) },
+  { id: "car", name: "Buy a Car", desc: "Freedom, four wheels, one exhaust note.", icon: "car", group: "Money", minAge: 18, cost: 28000, lock: (p) => (p.car ? "You already own a car." : eraLock(p, 28000)) },
   {
     id: "house",
     name: "Buy a House",
@@ -169,7 +169,7 @@ export const ACTIONS: ActionDef[] = [
       return p.money < down ? `Need ~30% down (≈ ${fmtSafe(down, p.countryId)}).` : null;
     },
   },
-  { id: "vacation", name: "Take a Vacation", desc: "You. A plane. A stranger's beach.", icon: "plane", group: "Money", cost: 3000, minAge: 8, lock: (p) => (p.money < 3000 ? "You need $3K." : p.age < 18 && !p.job ? "Parents have to agree. They didn't." : null) },
+  { id: "vacation", name: "Take a Vacation", desc: "You. A plane. A stranger's beach.", icon: "plane", group: "Money", cost: 3000, minAge: 8, lock: (p) => (p.age < 18 && !p.job ? "Parents have to agree. They didn't." : eraLock(p, 3000)) },
   { id: "gift", name: "Gift for a Child", desc: "One more toy. One more reason to love you.", icon: "gift", group: "Money", cost: 200, lock: (p) => (p.childrenIds.length === 0 ? "No children to spoil yet." : null) },
 
   { id: "date", name: "Go on a Date", desc: "New person, new playlist, new hope.", icon: "heart", group: "Relationships", minAge: 16, lock: (p) => (p.partnerId ? "You're already seeing someone." : null) },
@@ -177,7 +177,7 @@ export const ACTIONS: ActionDef[] = [
   { id: "propose", name: "Propose", desc: "Knee down, heart up.", icon: "ring", group: "Relationships", minAge: 18, lock: (p) => (!p.partnerId ? "You need a partner first." : p.flags.includes("married") ? "Already married." : (p.partnerValue ?? 50) < 65 ? "You two aren't there yet (65+ closeness)." : null) },
   { id: "divorce", name: "Get a Divorce", desc: "It's not you. It's... both of you.", icon: "x", group: "Relationships", minAge: 18, lock: (p) => (!p.flags.includes("married") ? "Not currently married." : null) },
   { id: "baby", name: "Try for a Baby", desc: "A tiny chaos engine, delivered by courier.", icon: "baby", group: "Relationships", minAge: 18, maxAge: 50, lock: (p) => (!p.partnerId ? "You need a partner." : null) },
-  { id: "adopt", name: "Adopt", desc: "Open the door. A whole world comes in.", icon: "gift", group: "Relationships", minAge: 21, cost: 8000, lock: (p) => (p.money < 8000 ? "You need $8K." : null) },
+  { id: "adopt", name: "Adopt", desc: "Open the door. A whole world comes in.", icon: "gift", group: "Relationships", minAge: 21, cost: 8000, lock: (p) => eraLock(p, 8000) },
 
   { id: "jobhunt", name: "Job Hunt", desc: "Cover letter, deep breath, knock.", icon: "briefcase", group: "Bigger Moves", minAge: 16, lock: (p) => (p.job ? "You're already employed." : p.retired ? "Retired. The couch is your boss." : p.uni ? "University has you on pause." : null) },
   { id: "promote", name: "Ask for a Promotion", desc: "Make your case. Bring coffee.", icon: "target", group: "Bigger Moves", lock: (p) => (!p.job ? "No job to get promoted in." : (p.job?.years ?? 0) < 2 ? "Work here at least 2 years first." : null) },
@@ -203,9 +203,15 @@ export const ACTIONS: ActionDef[] = [
   { id: "drop-uni", name: "Drop Out of University", desc: "The door stays open. So does the risk.", icon: "x", group: "Bigger Moves", lock: (p) => (!p.uni ? "Not enrolled right now." : null) },
   { id: "retire", name: "Retire Now", desc: "The pension letter reads like a victory lap.", icon: "sun", group: "Bigger Moves", minAge: 55, lock: (p) => (!p.job ? "Nothing to retire from." : p.age < 55 ? "At least wait until 55." : null) },
   { id: "learn", name: "Learn a Language", desc: "Tongue twisters, wrong verbs, right vibes.", icon: "globe", group: "Bigger Moves", minAge: 5, opt: { kind: "lang", label: "Pick a language" } },
-  { id: "relocate", name: "Move City", desc: "Same country, new postcode, new bakery.", icon: "plane", group: "Bigger Moves", minAge: 18, cost: 2500, opt: { kind: "city", label: "Pick a city" }, lock: (p) => (p.money < 2500 ? "You need $2.5K to move." : null) },
-  { id: "emigrate", name: "Move Abroad", desc: "New country, new currency, same you (probably).", icon: "globe", group: "Bigger Moves", minAge: 18, cost: 12000, opt: { kind: "country", label: "Pick a destination" }, lock: (p) => (p.money < 18000 ? "You need $18K (fees + a buffer)." : null) },
+  { id: "relocate", name: "Move City", desc: "Same country, new postcode, new bakery.", icon: "plane", group: "Bigger Moves", minAge: 18, cost: 2500, opt: { kind: "city", label: "Pick a city" }, lock: (p) => eraLock(p, 2500, "to move") },
+  { id: "emigrate", name: "Move Abroad", desc: "New country, new currency, same you (probably).", icon: "globe", group: "Bigger Moves", minAge: 18, cost: 12000, opt: { kind: "country", label: "Pick a destination" }, lock: (p) => eraLock(p, 18000, "(fees + a buffer)") },
 ];
+
+/** Era-aware affordability lock: modern-USD threshold -> nominal-year amount. */
+function eraLock(p: Char, modernNeed: number, suffix = ""): string | null {
+  const need = nominal(modernNeed, p.birthYear + p.age);
+  return p.money < need ? `You need ${fmtSafe(need, p.countryId)}${suffix ? " " + suffix : ""}.` : null;
+}
 
 function fmtSafe(v: number, countryId: string): string {
   return fmtMoney(v, countryId);

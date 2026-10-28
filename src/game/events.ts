@@ -31,6 +31,8 @@ export function makeCtx(s: GameState, p: Char): EventCtx {
 export function runEvent(s: GameState, p: Char, ev: LifeEvent, choice?: string) {
   const e = makeCtx(s, p);
   ev.run(e, choice);
+  // Event penalties must never leave a wallet below zero.
+  p.money = Math.max(0, Math.round(p.money));
   if (ev.once && !p.flags.includes(ev.id)) p.flags.push(ev.id);
   p.eventCooldowns[ev.id] = s.worldYear + (ev.cool ?? 5);
 }

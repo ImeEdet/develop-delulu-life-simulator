@@ -30,7 +30,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
       <div className="stars" />
       <div className="relative z-10 max-w-2xl mx-auto px-3 sm:px-4 pb-28">
         {/* Header */}
-        <header className="pt-4 pb-3 flex items-center gap-3">
+        <header className="pt-4 pb-3 flex items-center gap-3 safe-top">
           <Portrait c={p} size={46} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -100,7 +100,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
 
       {/* Age-up bar */}
       <div className="fixed bottom-0 inset-x-0 z-40">
-        <div className="max-w-2xl mx-auto px-3 sm:px-4 pb-3 pt-6 bg-gradient-to-t from-ink via-ink/95 to-transparent">
+        <div className="max-w-2xl mx-auto px-3 sm:px-4 pt-6 safe-bottom bg-gradient-to-t from-ink via-ink/95 to-transparent">
           {pending ? (
             <div className="panel px-4 py-3 flex items-center gap-3 border-peach/40">
               <span className="text-peach">

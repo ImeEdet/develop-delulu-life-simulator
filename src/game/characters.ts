@@ -369,7 +369,10 @@ export function createChild(s: GameState, mother: Char, father: Char, originCoun
     birthYear: s.worldYear,
     countryId: mother.countryId,
     city: mother.city,
-    generation: Math.max(mother.generation, father.generation) + 1,
+    // The outsider to a deeper lineage "marries in": a child's generation is
+    // one above the shallower parent so the player's direct lineage stays
+    // player+1 even when the other parent comes from a newer NPC family.
+    generation: Math.min(mother.generation, father.generation) + 1,
     motherId: mother.id,
     fatherId: father.id,
     wealthTier: mother.wealthTier,

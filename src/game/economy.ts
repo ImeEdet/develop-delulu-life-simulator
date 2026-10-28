@@ -52,9 +52,9 @@ export function repayLoans(c: Char, budget: number): number {
   const active = c.loans.filter((l) => l.balance > 0).sort((a, b) => b.rate - a.rate);
   for (const l of active) {
     if (remaining <= 0) break;
-    const pay = Math.min(l.balance, remaining);
-    l.balance -= pay;
-    remaining -= pay;
+    const pay = Math.round(Math.min(l.balance, remaining));
+    l.balance = Math.max(0, l.balance - pay);
+    remaining = Math.max(0, remaining - pay);
   }
   c.loans = c.loans.filter((l) => l.balance > 0);
   syncDebts(c);
@@ -169,10 +169,15 @@ export function payTuition(s: GameState, c: Char): { paid: number; borrowed: num
   let family = 0;
   if (owed > 0 && c.age <= 22 && (c.wealthTier ?? 1) >= 2) {
     const parents = [c.motherId, c.fatherId].map((id) => (id ? s.chars[id] : undefined)).filter((x): x is Char => !!x && x.alive);
-    const pot = parents.reduce((sum, par) => sum + par.money * 0.25, 0);
-    family = Math.min(owed, Math.round(pot));
-    for (const par of parents) par.money -= Math.round(family / parents.length);
-    owed -= family;
+    // Each parent offers up to a quarter of their own balance, and can never
+    // be charged more than they actually hold.
+    for (const par of parents) {
+      if (owed <= 0) break;
+      const share = Math.min(owed, Math.round(par.money * 0.25), par.money);
+      par.money = Math.max(0, par.money - share);
+      family += share;
+      owed -= share;
+    }
   }
   let borrowed = 0;
   if (owed > 0) {

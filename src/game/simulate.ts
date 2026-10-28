@@ -28,7 +28,7 @@ export function deathChance(c: Char): number {
   else if (a < 76) base = 0.012 + (a - 60) * 0.0025;
   else if (a < 86) base = 0.03 + (a - 75) * 0.008;
   else if (a < 96) base = 0.08 + (a - 85) * 0.012;
-  else base = 0.15;
+  else base = Math.min(0.95, 0.18 + (a - 96) * 0.06);
   base += ((100 - c.health) / 100) * 0.004;
   if (a >= 15 && a <= 45) base += 0.0015;
   if (c.health <= 5) base += 0.3;
@@ -326,7 +326,7 @@ function simulateNpcs(s: GameState, p: Char, Lf: (k: LogKind, t: string) => void
       c.job = null;
       c.retired = true;
     }
-    if (chance(deathChance(c))) handleNpcDeath(s, p, c, notes);
+    if (c.age >= 120 || chance(deathChance(c))) handleNpcDeath(s, p, c, notes);
   }
   for (const f of p.friends) {
     f.value = clamp(f.value - 2, -100, 100);
@@ -549,7 +549,7 @@ function settle(s: GameState, p: Char, Lf: (k: LogKind, t: string) => void) {
   }
 
   if (p.loans.length > 0 && cash > 0) {
-    const budget = Math.min(cash * 0.3, 25000);
+    const budget = Math.round(Math.min(cash * 0.3, 25000));
     repayLoans(p, budget);
     cash -= budget;
     if (p.debts === 0 && !p.flags.includes("debt-cleared-note")) {
@@ -650,6 +650,14 @@ function onPlayerDeath(s: GameState, p: Char, Lf: (k: LogKind, t: string) => voi
   p.alive = false;
   p.deathYear = s.worldYear;
   p.causeOfDeath = deathCause(p);
+  // Release the surviving spouse so a living character is never left
+  // partnered to someone who has died.
+  const spouse = p.partnerId ? s.chars[p.partnerId] : undefined;
+  if (spouse && spouse.alive) {
+    spouse.partnerHistory.push(p.id);
+    spouse.partnerId = undefined;
+    spouse.partnerValue = 0;
+  }
   const c = country(p.countryId);
   Lf("milestone", `${p.firstName} died at ${p.age}, ${p.causeOfDeath}.`);
   distributeEstate(s, p, p);
