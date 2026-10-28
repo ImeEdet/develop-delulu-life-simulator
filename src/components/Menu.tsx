@@ -8,6 +8,7 @@ import { groupsForCountry, makeFirstName, makeSurname, rollGender } from "../gam
 import { NAME_GROUPS } from "../game/name-data";
 import { ri } from "../game/rng";
 import { POWER_BY_ID, SUPER_POWERS, powerTier, randomSuperOptions } from "../game/super";
+import { APP_VERSION } from "../game/appVersion";
 import type { GameApi } from "../game/state";
 import { Chip, DiceBtn, I, SectionTitle } from "./ui";
 
@@ -82,6 +83,9 @@ export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
             </div>
             <p className="text-center text-dim/60 text-xs mt-10">
               {currentMeta ? `${currentMeta.name} · ` : ""}Lives lived: {s?.livesLived ?? 0} · autosave on
+            </p>
+            <p className="text-center text-dim/50 text-[10px] mt-2" aria-label={`App version ${APP_VERSION}`}>
+              Version {APP_VERSION}
             </p>
           </div>
         )}

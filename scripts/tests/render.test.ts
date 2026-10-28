@@ -7,6 +7,7 @@ import { Game } from "../../src/components/Game";
 import { UpdateBanner } from "../../src/components/UpdateBanner";
 import { setSeed } from "../../src/game/rng";
 import { newRandomLife } from "../../src/game/characters";
+import { APP_RELEASE_VERSION, APP_VERSION } from "../../src/game/appVersion";
 import { hasWaitingUpdate, shouldCheckForUpdate, UPDATE_POLL_INTERVAL_MS } from "../../src/game/useAppUpdate";
 import type { GameApi } from "../../src/game/state";
 import { assert } from "./util";
@@ -55,6 +56,8 @@ export const tests = [
       assert(html.includes("New Life — Random"), "random entry missing");
       assert(html.includes("New Life — Custom"), "custom entry missing");
       assert(html.includes("Saved Lives"), "save slots entry missing");
+      assert(html.includes(`aria-label="App version ${APP_VERSION}"`) && html.includes(APP_VERSION), "main menu does not show the current build version");
+      assert(APP_VERSION.startsWith(`v${APP_RELEASE_VERSION}+`), "build version is not tied to the release version");
     },
   },
   {
