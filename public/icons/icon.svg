@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2e1c58"/>
+      <stop offset="1" stop-color="#15102a"/>
+    </linearGradient>
+    <radialGradient id="pink" cx="0.82" cy="0.12" r="0.7">
+      <stop offset="0" stop-color="#ff5fa2" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff5fa2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mint" cx="0.12" cy="0.88" r="0.7">
+      <stop offset="0" stop-color="#5ce8a9" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#5ce8a9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="92" fill="url(#dusk)"/>
+  <rect width="512" height="512" rx="92" fill="url(#pink)"/>
+  <rect width="512" height="512" rx="92" fill="url(#mint)"/>
+  <path d="M102 92h24l104 14v300l-104 14H90V92h12z" fill="#f4efff"/>
+  <path d="M128 146h40c70 0 118 42 118 110s-48 110-118 110h-40V146zm36 62v96h10c36 0 58-20 58-48s-22-48-58-48h-10z" fill="#f4efff"/>
+  <path d="M102 110l14-26 14 26-14 8z" fill="#ffd166"/>
+</svg>

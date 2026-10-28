@@ -136,6 +136,44 @@ body {
 ::-webkit-scrollbar-thumb { background: #3a2e64; border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: #4d3d85; }
 
-input[type="text"] {
+input[type="text"],
+input[type="number"],
+input[type="range"] {
   outline: none;
+}
+
+/* ---- PWA / notched-phone safe areas ---- */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+  .safe-top {
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Touch targets stay comfortable on phones. */
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent horizontal overflow from wide chips/ribbons on narrow iPhones. */
+nav,
+.flex-wrap-safe {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+nav::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 380px) {
+  .font-display.text-6xl {
+    font-size: 3.4rem;
+  }
 }
