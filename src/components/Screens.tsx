@@ -11,7 +11,7 @@ import { Chip, CountryTag, I, Portrait, SectionTitle } from "./ui";
 export const majorName = (id: string) => MAJOR_LIST.find((m) => m.id === id)?.name ?? id;
 
 function statusOf(c: Char): string {
-  if (!c.alive) return `died at ${c.age} · ${c.deathYear}`;
+  if (!c.alive) return `died aged ${c.age}${c.deathYear ? ` · ${c.deathYear}` : ""}`;
   if (c.age < 3) return "still discovering gravity";
   if (c.age < 6) return "preschool and small tyrannies";
   if (c.age < 12) return "primary school";
@@ -23,14 +23,19 @@ function statusOf(c: Char): string {
   return "figuring it out";
 }
 
-function CharCard({ c, label, showMoney = false }: { c: Char; label: string; showMoney?: boolean }) {
+function CharCard({ c, label, showMoney = false, onSelect }: { c: Char; label: string; showMoney?: boolean; onSelect: (id: string) => void }) {
   return (
-    <div className={`panel-inset p-3 flex gap-3 ${c.alive ? "" : "opacity-70"}`}>
+    <button
+      type="button"
+      onClick={() => onSelect(c.id)}
+      aria-label={`View ${c.firstName} ${c.lastName}, ${label}, profile`}
+      className={`panel-inset w-full min-h-[68px] p-3 flex gap-3 text-left transition-colors hover:border-peach/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-peach ${c.alive ? "" : "opacity-70"}`}
+    >
       <Portrait c={c} size={40} className="shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-bold text-sm truncate">
-            {c.firstName} <span className="text-dim font-semibold">{c.age}</span>
+            {c.firstName} {c.lastName} <span className="text-dim font-semibold">{c.age}</span>
           </p>
           <CountryTag id={c.countryId} />
           <span className="text-[10px] uppercase tracking-wider font-extrabold text-dim/80">{label}</span>
@@ -47,11 +52,11 @@ function CharCard({ c, label, showMoney = false }: { c: Char; label: string; sho
           )}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
-export function FamilyScreen({ s }: { s: GameState }) {
+export function FamilyScreen({ s, onSelectNpc = () => {} }: { s: GameState; onSelectNpc?: (id: string) => void }) {
   const p = s.chars[s.currentId];
   const get = (id?: string) => (id ? s.chars[id] : undefined);
   const mother = get(p.motherId);
@@ -75,8 +80,8 @@ export function FamilyScreen({ s }: { s: GameState }) {
       <section>
         <SectionTitle icon="heart">Parents</SectionTitle>
         <div className="grid sm:grid-cols-2 gap-2">
-          {mother && <CharCard c={mother} label="mother" showMoney />}
-          {father && <CharCard c={father} label="father" showMoney />}
+          {mother && <CharCard c={mother} label="mother" showMoney onSelect={onSelectNpc} />}
+          {father && <CharCard c={father} label="father" showMoney onSelect={onSelectNpc} />}
           {!mother && !father && <p className="text-dim text-sm">You grew up with the whole street as family.</p>}
         </div>
       </section>
@@ -85,7 +90,7 @@ export function FamilyScreen({ s }: { s: GameState }) {
           <SectionTitle icon="sun">Grandparents</SectionTitle>
           <div className="grid sm:grid-cols-2 gap-2">
             {grandmas.map((g) => (
-              <CharCard key={g.id} c={g} label={g.gender === "female" ? "grandmother" : "grandfather"} showMoney />
+              <CharCard key={g.id} c={g} label={g.gender === "female" ? "grandmother" : "grandfather"} showMoney onSelect={onSelectNpc} />
             ))}
           </div>
         </section>
@@ -96,7 +101,7 @@ export function FamilyScreen({ s }: { s: GameState }) {
           {siblings.length === 0 && <p className="text-dim text-sm">An only child. The whole story is yours.</p>}
           {siblings.map((c) => (
             <div key={c.id} className="space-y-1.5">
-              <CharCard c={c} label={c.gender === "female" ? "sister" : "brother"} showMoney />
+              <CharCard c={c} label={c.gender === "female" ? "sister" : "brother"} showMoney onSelect={onSelectNpc} />
               {(() => {
                 const par = get(c.partnerId);
                 const kids2 = c.childrenIds.map((id) => s.chars[id]).filter(Boolean);
@@ -104,14 +109,18 @@ export function FamilyScreen({ s }: { s: GameState }) {
                 return (
                   <div className="ml-8 flex flex-wrap gap-1.5">
                     {par && (
-                      <Chip color="pink">
-                        <I name="ring" className="w-3 h-3" /> {c.age > 26 ? "married" : "with"} {par.firstName} ({par.age})
-                      </Chip>
+                      <button type="button" onClick={() => onSelectNpc(par.id)} className="min-h-11 inline-flex items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-peach" aria-label={`View ${par.firstName} ${par.lastName}, sibling's partner`}>
+                        <Chip color="pink">
+                          <I name="ring" className="w-3 h-3" /> {c.age > 26 ? "married" : "with"} {par.firstName} ({par.age})
+                        </Chip>
+                      </button>
                     )}
                     {kids2.map((k) => (
-                      <Chip key={k.id} color="mint">
-                        <I name="baby" className="w-3 h-3" /> {k.firstName}, {k.age}
-                      </Chip>
+                      <button key={k.id} type="button" onClick={() => onSelectNpc(k.id)} className="min-h-11 inline-flex items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-peach" aria-label={`View ${k.firstName} ${k.lastName}, niece or nephew`}>
+                        <Chip color="mint">
+                          <I name="baby" className="w-3 h-3" /> {k.firstName}, {k.age}
+                        </Chip>
+                      </button>
                     ))}
                   </div>
                 );
@@ -123,13 +132,13 @@ export function FamilyScreen({ s }: { s: GameState }) {
       {partner && (
         <section>
           <SectionTitle icon="ring">{p.flags.includes("married") ? "Spouse" : "Partner"}</SectionTitle>
-          <CharCard c={partner} label={p.flags.includes("married") ? "spouse" : "partner"} showMoney />
+          <CharCard c={partner} label={p.flags.includes("married") ? "spouse" : "partner"} showMoney onSelect={onSelectNpc} />
           {stepkids.length > 0 && (
             <>
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-dim mt-3 mb-1.5">Their children</p>
               <div className="grid sm:grid-cols-2 gap-2">
                 {stepkids.map((c) => (
-                  <CharCard key={c.id} c={c} label="stepchild" />
+                  <CharCard key={c.id} c={c} label="stepchild" onSelect={onSelectNpc} />
                 ))}
               </div>
             </>
@@ -144,14 +153,19 @@ export function FamilyScreen({ s }: { s: GameState }) {
           <div className="grid sm:grid-cols-2 gap-2">
             {kids.map((c) => (
               <div key={c.id} className="space-y-1.5">
-                <CharCard c={c} label={c.gender === "female" ? "daughter" : "son"} />
+                <CharCard c={c} label={c.gender === "female" ? "daughter" : "son"} onSelect={onSelectNpc} />
                 {c.childrenIds.length > 0 && (
                   <div className="ml-8 flex flex-wrap gap-1.5">
-                    {c.childrenIds.map((id) => (
-                      <Chip key={id} color="mint">
-                        <I name="baby" className="w-3 h-3" /> grandkid {s.chars[id]?.firstName}
-                      </Chip>
-                    ))}
+                    {c.childrenIds.map((id) => {
+                      const grandchild = s.chars[id];
+                      return grandchild ? (
+                        <button key={id} type="button" onClick={() => onSelectNpc(grandchild.id)} className="min-h-11 inline-flex items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-peach" aria-label={`View ${grandchild.firstName} ${grandchild.lastName}, grandchild`}>
+                          <Chip color="mint">
+                            <I name="baby" className="w-3 h-3" /> grandkid {grandchild.firstName}
+                          </Chip>
+                        </button>
+                      ) : null;
+                    })}
                   </div>
                 )}
               </div>
@@ -161,7 +175,7 @@ export function FamilyScreen({ s }: { s: GameState }) {
         {grandkids.length > 0 && (
           <div className="grid sm:grid-cols-2 gap-2 mt-2">
             {grandkids.map((c) => (
-              <CharCard key={c.id} c={c} label="grandchild" />
+              <CharCard key={c.id} c={c} label="grandchild" onSelect={onSelectNpc} />
             ))}
           </div>
         )}
@@ -173,7 +187,7 @@ export function FamilyScreen({ s }: { s: GameState }) {
         ) : (
           <div className="grid sm:grid-cols-2 gap-2">
             {friends.map(({ c, value }) => (
-              <div key={c.id} className="panel-inset p-3">
+              <button key={c.id} type="button" onClick={() => onSelectNpc(c.id)} aria-label={`View ${c.firstName} ${c.lastName}, ${value >= 0 ? "friend" : "rival"}, profile`} className="panel-inset w-full p-3 text-left hover:border-peach/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-peach">
                 <div className="flex gap-3 items-center">
                   <Portrait c={c} size={36} />
                   <div className="min-w-0 flex-1">
@@ -190,7 +204,7 @@ export function FamilyScreen({ s }: { s: GameState }) {
                     style={{ width: `${Math.abs(value)}%`, background: value >= 0 ? "#5ce8a9" : "#ff6b6b" }}
                   />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

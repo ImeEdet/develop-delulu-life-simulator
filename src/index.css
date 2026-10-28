@@ -179,6 +179,19 @@ html {
   overflow-x: clip;
 }
 
+/* NPC detail sheet stays within the visible device viewport, including iOS/Android chrome. */
+.npc-profile-sheet {
+  max-height: 94vh;
+  max-height: 94dvh;
+}
+
+@media (min-width: 40rem) {
+  .npc-profile-sheet {
+    max-height: 88vh;
+    max-height: 88dvh;
+  }
+}
+
 /* Android Chrome and installed PWAs use a changing viewport as browser UI opens/closes. */
 @supports (min-height: 100dvh) {
   .min-h-screen {
