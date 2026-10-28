@@ -20,7 +20,7 @@ export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
   return (
     <div className="relative min-h-screen bg-dusk flex flex-col">
       <div className="stars" />
-      <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 py-8 sm:py-12">
+      <main className="relative z-10 flex-1 w-full max-w-2xl mx-auto px-4 py-8 sm:py-12 safe-page-top">
         {screen === "menu" && (
           <div className="anim-rise">
             <div className="text-center mt-6 sm:mt-14 mb-10">

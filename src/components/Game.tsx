@@ -77,7 +77,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-extrabold border transition-colors shrink-0 ${
+              className={`flex min-h-10 items-center gap-1.5 px-3.5 py-2.5 rounded-full text-[13px] font-extrabold border transition-colors shrink-0 ${
                 tab === t.id ? "bg-peach text-ink border-peach" : "bg-ink2 text-dim border-line hover:text-txt"
               }`}
             >
@@ -113,7 +113,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
             </div>
           ) : (
             <button
-              className="btn-primary anim-glow w-full rounded-2xl px-6 py-4 flex items-center justify-center gap-3 text-xl font-display font-black tracking-wide"
+              className="btn-primary anim-glow w-full rounded-2xl px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3 text-lg sm:text-xl font-display font-black tracking-wide"
               disabled={s.over || !p.alive}
               onClick={() => {
                 setTab("life");
@@ -122,7 +122,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
             >
               <I name="feather" className="w-5 h-5" />
               TURN THE PAGE
-              <span className="text-sm font-body font-bold opacity-70">
+              <span className="text-xs sm:text-sm font-body font-bold opacity-70">
                 age {p.age} → {p.age + 1} · {s.worldYear + 1}
               </span>
             </button>
