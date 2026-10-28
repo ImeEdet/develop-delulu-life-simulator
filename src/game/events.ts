@@ -2,12 +2,14 @@ import type { Char, EventCtx, GameState, LifeEvent } from "./types";
 import { country, LANGS } from "./world";
 import {
   CARS, EMPLOYERS, JOBS, MAJOR_LIST,
-  eligibleJobs, hasFluency, jobSalary, suggestedMajor, traitMod,
+  eligibleJobs, hasFluency, suggestedMajor, traitMod,
 } from "./content";
 import { clamp, createChild, pick } from "./characters";
+import { nominalSalary } from "./economy";
+import { random } from "./rng";
 
 export function makeCtx(s: GameState, p: Char): EventCtx {
-  const rnd = Math.random;
+  const rnd = random;
   return {
     s,
     p,
@@ -29,6 +31,8 @@ export function makeCtx(s: GameState, p: Char): EventCtx {
 export function runEvent(s: GameState, p: Char, ev: LifeEvent, choice?: string) {
   const e = makeCtx(s, p);
   ev.run(e, choice);
+  // Event penalties must never leave a wallet below zero.
+  p.money = Math.max(0, Math.round(p.money));
   if (ev.once && !p.flags.includes(ev.id)) p.flags.push(ev.id);
   p.eventCooldowns[ev.id] = s.worldYear + (ev.cool ?? 5);
 }
@@ -62,7 +66,7 @@ function landJob(e: EventCtx, jobId: string) {
   const def = JOBS[jobId];
   if (!def) return;
   const employer = pick(EMPLOYERS);
-  e.p.job = { jobId, seniority: 0, salary: jobSalary(def, e.p, 0), years: 0, employer };
+  e.p.job = { jobId, seniority: 0, salary: nominalSalary(e.p, def, 0, e.s.worldYear), years: 0, employer };
   e.log("career", `${employer} hired you as ${def.title}. ${def.desc}`);
   if (!e.p.flags.includes("first-job")) {
     e.p.flags.push("first-job");
@@ -110,13 +114,13 @@ export const EVENTS: LifeEvent[] = [
     id: "crossroads", title: "The Crossroads", weight: 0, scripted: true, minAge: 18, maxAge: 22,
     text: (e) => {
       const retry = e.p.flags.includes("f18-retry");
-      const major = MJ(suggestedMajor(e.p));
+      const major = MJ(e.p.plannedMajor ?? suggestedMajor(e.p));
       return retry
         ? `Still ${e.p.age}. The crossroads is patient. (${e.p.examScore ?? 40} exam score, ${e.p.money < 8000 ? "pockets lighter than a church mouse" : "enough saved for a big swing"})`
         : `You're ${e.p.age}. The map is open: university in ${major} (exam score ${e.p.examScore ?? 40}/100), jobs, the whole wild world.`;
     },
     choices: (e) => {
-      const major = suggestedMajor(e.p);
+      const major = e.p.plannedMajor ?? suggestedMajor(e.p);
       const out = [{ id: `uni:${major}`, label: `Go to university — ${MJ(major)}`, hint: "Four years. One enormous bet." }];
       out.push({ id: "work", label: "Start working now", hint: "Money first, dreams at night." });
       if (e.p.money >= 8000) out.push({ id: "travel", label: "Travel for a year", hint: "$8K and one backpack." });
@@ -220,8 +224,12 @@ export const EVENTS: LifeEvent[] = [
     run: (e, choice) => {
       const par = e.other(e.p.partnerId);
       if (!par) return;
-      const mother = e.p.gender === "female" ? e.p : par;
-      const father = e.p.gender === "female" ? par : e.p;
+      const mother = e.p.gender === "female" ? e.p : par.gender === "female" ? par : undefined;
+      if (!mother) {
+        e.log("neutral", "You two make plans and scrapbooks instead; the adoption office keeps the door open.");
+        return;
+      }
+      const father = mother === e.p ? par : e.p;
       if (choice === "raise") {
         const child = createChild(e.s, mother, father);
         e.p.milestones.push({ year: e.s.worldYear, age: e.p.age, text: `Welcomed ${child.firstName}` });
@@ -282,6 +290,95 @@ export const EVENTS: LifeEvent[] = [
         } else {
           e.log("family", `You and ${par.firstName} went your separate ways. It was kind, which is the hard kind.`);
         }
+      }
+    },
+  },
+
+  // ================= BABY & TODDLER =================
+  {
+    id: "baby-mobiles", title: "The Ceiling Concert", weight: 2, minAge: 0, maxAge: 1, once: true,
+    text: () => "The ceiling mobile is the greatest show ever staged. You tell it so, at considerable volume, at 3 a.m.",
+    choices: () => [
+      { id: "sing", label: "Sing along, loudly" },
+      { id: "grab", label: "Grab it. Become its manager." },
+    ],
+    run: (e, choice) => {
+      if (choice === "sing") {
+        st(e, "happiness", 3);
+        e.log("good", "Your debut single was mostly vowels. The critics (your parents) wept.");
+      } else {
+        st(e, "smarts", 1);
+        e.log("neutral", "You caught the mobile mid-spin. Hand-eye coordination: operational.");
+      }
+    },
+  },
+  {
+    id: "baby-solid", title: "The First Spoon", weight: 2, minAge: 0, maxAge: 1, once: true,
+    text: () => "A spoon arrives carrying something that is definitely not milk. The spoon has questions. So do you.",
+    choices: () => [
+      { id: "open", label: "Open the hangar" },
+      { id: "reject", label: "Politely redecorate the wall" },
+    ],
+    run: (e, choice) => {
+      if (choice === "open") {
+        st(e, "health", 3);
+        e.log("good", "The first spoonful landed mostly inside you. Growth, in every sense.");
+      } else {
+        st(e, "happiness", 1);
+        e.log("neutral", "The wall got more porridge than you did. The wall has no opinion. Your mother does.");
+      }
+    },
+  },
+  {
+    id: "toddler-crawl", title: "The Great Escape", weight: 2, minAge: 1, maxAge: 2, once: true,
+    text: () => "The rug is a continent and the far sofa is its undiscovered coast. Nobody has ever wanted anything this much.",
+    choices: () => [
+      { id: "go", label: "Crawl for the coast" },
+      { id: "sit", label: "Rule the rug instead" },
+    ],
+    run: (e, choice) => {
+      if (choice === "go") {
+        st(e, "health", 3);
+        st(e, "happiness", 2);
+        e.log("good", "You crossed the entire living room. A grown-up cheered like you had summited something.");
+      } else {
+        st(e, "smarts", 1);
+        e.log("neutral", "You stayed put and studied the adults. Rulers choose their moment.");
+      }
+    },
+  },
+  {
+    id: "toddler-no", title: "The Favorite Word", weight: 2, minAge: 2, maxAge: 3, once: true,
+    text: () => "You have discovered a word of enormous power. It is two letters long and it ends every conversation.",
+    choices: () => [
+      { id: "no", label: "Use it on everything" },
+      { id: "yes", label: "Try the other one instead" },
+    ],
+    run: (e, choice) => {
+      if (choice === "no") {
+        st(e, "happiness", 2);
+        e.log("neutral", "\"No.\" Shoes? No. Bath? No. Broccoli? Historically correct. The word served you well.");
+      } else {
+        st(e, "smarts", 2);
+        e.log("good", "You experimented with \"yes\" and found doors. Also hugs. Mostly doors.");
+      }
+    },
+  },
+  {
+    id: "preschool-art", title: "The Masterpiece", weight: 2, minAge: 3, maxAge: 5, cool: 6,
+    text: () => "Crayons have been issued. The refrigerator door is about to host a gallery opening.",
+    choices: () => [
+      { id: "family", label: "Draw the family" },
+      { id: "abstract", label: "Pure feeling, no notes" },
+    ],
+    run: (e, choice) => {
+      if (choice === "family") {
+        st(e, "happiness", 3);
+        e.log("good", "Your family portrait gave everyone enormous hands and enormous smiles. It went on the fridge immediately.");
+      } else {
+        st(e, "smarts", 1);
+        st(e, "happiness", 2);
+        e.log("neutral", "The picture was eleven colors having an argument. You called it \"Wednesday.\" Critics were stunned.");
       }
     },
   },
@@ -589,7 +686,7 @@ export const EVENTS: LifeEvent[] = [
     },
   },
   {
-    id: "viral-fail", title: "The Video", weight: 2, minAge: 13, maxAge: 17, cool: 8,
+    id: "viral-fail", title: "The Video", weight: 2, minAge: 13, maxAge: 17, cool: 8, minYear: 2007,
     text: () => "Someone filmed you mid-disaster and everyone is suddenly very interested in your phone.",
     choices: () => [
       { id: "own", label: "Post it yourself" },
@@ -829,7 +926,7 @@ export const EVENTS: LifeEvent[] = [
     },
   },
   {
-    id: "dreamcoin", title: "DREAMCOIN", weight: 2, minAge: 25, maxAge: 60,
+    id: "dreamcoin", title: "DREAMCOIN", weight: 2, minAge: 25, maxAge: 60, minYear: 2013,
     when: (e) => e.p.money >= 20000,
     text: () => "Everyone at your favorite spot is talking about DREAMCOIN. It has a rocket logo. The rocket logo is doing numbers.",
     choices: () => [
@@ -911,7 +1008,7 @@ export const EVENTS: LifeEvent[] = [
         e.log("good", "You bought the bike. It is louder than the manual allows and exactly the right volume for the soul.");
       } else if (choice === "podcast") {
         st(e, "happiness", 4);
-        e.p.milestones.push({ year: e.s.worldYear, age: e.p.age, text: "Started a podcast" });
+        e.p.milestones.push({ year: e.s.worldYear, age: e.p.age, text: e.s.worldYear >= 2005 ? "Started a podcast" : "Started a little radio show" });
         e.log("good", "You started the podcast. Episode one is you and a friend talking about the fridge. It has 12 listeners. All twelve agree.");
       } else {
         st(e, "happiness", 1);
@@ -965,7 +1062,7 @@ export const EVENTS: LifeEvent[] = [
     },
   },
   {
-    id: "phone-lake", title: "The Lake Incident", weight: 1, minAge: 18, maxAge: 65, cool: 10,
+    id: "phone-lake", title: "The Lake Incident", weight: 1, minAge: 18, maxAge: 65, cool: 10, minYear: 2010,
     text: () => "You were by the lake. The phone was in your pocket. Now the phone is in the lake. This is a sequence of facts.",
     choices: () => [
       { id: "fish", label: "Fish it out, immediately" },

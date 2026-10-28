@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { Char, GameState } from "../game/types";
 import { country, fmtMoney, LANGS } from "../game/world";
-import { JOBS, MAJOR_LIST, SENIORITY, TRAIT_LIST, eligibleJobs, isImmigrant, jobSalary, livingCost } from "../game/content";
+import { JOBS, MAJOR_LIST, SENIORITY, TRAIT_LIST, eligibleJobs, isImmigrant, jobSalary } from "../game/content";
+import { livingCost, netWorth, totalDebt, financialStatus } from "../game/economy";
+import { nominal } from "../game/era";
 import { actionLock } from "../game/actions";
 import type { GameApi } from "../game/state";
 import { Chip, CountryTag, I, Portrait, SectionTitle } from "./ui";
@@ -202,8 +204,15 @@ export function WorkScreen({ s, g }: { s: GameState; g: GameApi }) {
   const [applied, setApplied] = useState<string | null>(null);
   const job = p.job ? JOBS[p.job.jobId] : null;
   const appliedThisYear = p.usedActions.includes("jobhunt");
+  const cty = country(p.countryId);
   const schoolLine =
-    p.age < 6 ? "Before school. Full-time exploring." : p.age < 12 ? `Primary school · grade ${p.age - 5}` : p.age < 17 ? `Secondary school · year ${p.age - 11} of 6` : "Secondary complete";
+    p.age < cty.schoolStart
+      ? "Before school. Full-time exploring."
+      : p.age < cty.secondaryStart
+        ? `Primary school · year ${p.age - cty.schoolStart + 1}`
+        : p.age <= cty.examAge
+          ? `Secondary school · year ${p.age - cty.secondaryStart + 1}`
+          : "Secondary complete";
 
   return (
     <div className="space-y-6 pb-6">
@@ -288,7 +297,7 @@ export function WorkScreen({ s, g }: { s: GameState; g: GameApi }) {
                 <div key={j.id} className={`panel-inset p-3 ${p.job?.jobId === j.id ? "border-lav/50" : ""}`}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-bold text-sm">{j.title}</p>
-                    <Chip color="gold">{fmtMoney(jobSalary(j, p, 0), p.countryId)}/yr</Chip>
+                    <Chip color="gold">{fmtMoney(nominal(jobSalary(j, p, 0), s.worldYear), p.countryId)}/yr</Chip>
                   </div>
                   <p className="text-xs text-dim mt-1">{j.desc}</p>
                   <div className="flex flex-wrap gap-1 mt-2">
@@ -326,12 +335,13 @@ export function MoneyScreen({ s, g }: { s: GameState; g: GameApi }) {
   const p = s.chars[s.currentId];
   const kid = p.age < 18 && !p.job && !p.uni;
   const income = p.retired ? p.pension : p.job ? p.job.salary : 0;
-  const net = p.money - p.debts + (p.house?.value ?? 0) + (p.car?.value ?? 0);
+  const net = netWorth(p);
+  const debt = totalDebt(p);
   const purchases: { id: string; name: string; icon: string; note: string }[] = [
-    { id: "house", name: "Buy a house", icon: "home", note: `≈ ${fmtMoney(Math.round(160000 * country(p.countryId).costIndex), p.countryId)}, 30% down` },
-    { id: "car", name: "Buy a car", icon: "car", note: "freedom, four wheels" },
-    { id: "vacation", name: "Vacation", icon: "plane", note: "you, a plane, a beach" },
-    { id: "invest", name: "Invest $10K", icon: "wallet", note: "money at work" },
+    { id: "house", name: "Buy a house", icon: "home", note: `≈ ${fmtMoney(nominal(Math.round(160000 * country(p.countryId).costIndex), s.worldYear), p.countryId)}, 30% down` },
+    { id: "car", name: "Buy a car", icon: "car", note: `≈ ${fmtMoney(nominal(28000, s.worldYear), p.countryId)}, four wheels` },
+    { id: "vacation", name: "Vacation", icon: "plane", note: `≈ ${fmtMoney(nominal(3000, s.worldYear), p.countryId)}, you, a plane, a beach` },
+    { id: "invest", name: "Invest $10K", icon: "wallet", note: `≈ ${fmtMoney(nominal(10000, s.worldYear), p.countryId)} at work` },
     { id: "lottery", name: "Lottery ticket", icon: "dice", note: "a realistic dream" },
     { id: "gift", name: "Gift for a child", icon: "gift", note: "one more toy" },
   ];
@@ -343,7 +353,8 @@ export function MoneyScreen({ s, g }: { s: GameState; g: GameApi }) {
             <SectionTitle icon="coin">Pocket Money</SectionTitle>
             <p className="font-display font-black text-4xl text-gold">{fmtMoney(p.money, p.countryId)}</p>
             <p className="text-sm text-dim mt-1">
-              The household money is your parents' problem. Your problem is this small, mighty fortune.
+              The household bills are your parents' problem — rent, food and school fees come out of their accounts.
+              Your problem is this small, mighty fortune.
             </p>
           </div>
         ) : (
@@ -356,13 +367,14 @@ export function MoneyScreen({ s, g }: { s: GameState; g: GameApi }) {
               <div className="text-right">
                 <p className="text-[11px] font-extrabold uppercase tracking-wider text-dim">Net worth</p>
                 <p className={`font-display font-bold text-xl ${net < 0 ? "text-coral" : "text-mint"}`}>{fmtMoney(net, p.countryId)}</p>
+                <p className="text-[10px] font-bold text-peach capitalize">{financialStatus(p, s.worldYear)}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
               {[
                 { l: "Income / yr", v: income > 0 ? fmtMoney(income, p.countryId) : "—", c: "text-mint" },
-                { l: "Living / yr", v: fmtMoney(livingCost(p), p.countryId), c: "text-coral" },
-                { l: "Debts", v: p.debts > 0 ? fmtMoney(p.debts, p.countryId) : "none", c: p.debts > 0 ? "text-coral" : "text-dim" },
+                { l: "Living / yr", v: fmtMoney(livingCost(p, p.birthYear + p.age), p.countryId), c: "text-coral" },
+                { l: "Debts", v: debt > 0 ? fmtMoney(debt, p.countryId) : "none", c: debt > 0 ? "text-coral" : "text-dim" },
                 { l: "Status", v: p.retired ? "retired" : p.job ? "employed" : "seeking", c: "text-lav" },
               ].map((x) => (
                 <div key={x.l} className="panel-inset p-2.5">
@@ -396,6 +408,28 @@ export function MoneyScreen({ s, g }: { s: GameState; g: GameApi }) {
           <p className="text-dim text-sm">No assets yet. Everything is currently rented, borrowed, or imaginary.</p>
         )}
       </section>
+
+      {p.loans.length > 0 && (
+        <section>
+          <SectionTitle icon="wallet">Loans</SectionTitle>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {p.loans.map((ln) => (
+              <div key={ln.id} className="panel-inset p-3">
+                <p className="font-bold text-sm capitalize flex items-center gap-2">
+                  <I name="wallet" className="w-4 h-4 text-coral" />
+                  {ln.kind} loan
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  <Chip color="coral">{fmtMoney(ln.balance, p.countryId)} left</Chip>
+                  <Chip color="dim">{Math.round(ln.rate * 100)}% / yr</Chip>
+                  <Chip color="dim">since {ln.yearTaken}</Chip>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-dim mt-2">Interest compounds every year; up to 30% of spare cash automatically goes toward repayment.</p>
+        </section>
+      )}
 
       {!kid && (
         <section>

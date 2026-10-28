@@ -1,7 +1,9 @@
 import type { Char, GameState, LogKind } from "./types";
 import { COUNTRY_LIST, LANGS, country, fmtMoney } from "./world";
-import { ACTIONS, CARS, EMPLOYERS, JOBS, MAJOR_LIST, eligibleJobs, hiringChance, jobSalary, suggestedMajor } from "./content";
-import { clamp, createChild, makeNpcPerson, pick } from "./characters";
+import { ACTIONS, CARS, EMPLOYERS, JOBS, MAJOR_LIST, eligibleJobs, hiringChance, proficiencyLabel, suggestedMajor } from "./content";
+import { clamp, pick, chance, random } from "./rng";
+import { createChild, makeNpcPerson } from "./characters";
+import { nominal, nominalSalary, takeLoan, eraFactor } from "./economy";
 
 function L(s: GameState, p: Char, kind: LogKind, text: string) {
   s.log.push({ id: s.seq++, year: s.worldYear, age: p.age, text, kind });
@@ -19,7 +21,10 @@ export function actionLock(s: GameState, id: string): string | null {
   if (!def) return null;
   if (def.minAge && p.age < def.minAge) return `Available from age ${def.minAge}.`;
   if (def.maxAge && p.age > def.maxAge) return "Past this chapter.";
-  if (def.cost && p.money < def.cost && p.age >= 18) return `Needs ${fmtMoney(def.cost, p.countryId)}.`;
+  if (def.cost && p.age >= 18) {
+    const need = nominal(def.cost, s.worldYear);
+    if (p.money < need) return `Needs ${fmtMoney(need, p.countryId)}.`;
+  }
   if (def.lock) {
     const r = def.lock(p);
     if (r) return r;
@@ -35,7 +40,7 @@ function markUsed(p: Char, id: string) {
 function tryLandJob(s: GameState, p: Char, jobId: string): boolean {
   const def = eligibleJobs(p).find((j) => j.id === jobId);
   if (!def) return false;
-  if (Math.random() > hiringChance(p, def)) return false;
+  if (random() > hiringChance(p, def)) return false;
   const employer = pick(EMPLOYERS);
   if (p.job) {
     p.flags.push("job-switched");
@@ -48,7 +53,7 @@ function tryLandJob(s: GameState, p: Char, jobId: string): boolean {
       L(s, p, "milestone", "First real paycheck in your life. It feels like a small, loud superpower.");
     }
   }
-  p.job = { jobId: def.id, seniority: 0, salary: jobSalary(def, p, 0), years: 0, employer };
+  p.job = { jobId: def.id, seniority: 0, salary: nominalSalary(p, def, 0, s.worldYear), years: 0, employer };
   p.retired = false;
   return true;
 }
@@ -57,6 +62,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
   const p = s.chars[s.currentId];
   if (!p.alive || s.over) return;
   if (id !== "apply" && actionLock(s, id)) return;
+  const moneyBefore = p.money;
 
   switch (id) {
     case "exercise":
@@ -88,10 +94,10 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       break;
     }
     case "party":
-      p.money -= 150;
+      p.money -= nominal(150, s.worldYear);
       p.happiness = clamp(p.happiness + 7);
       p.health = clamp(p.health - 2);
-      if (Math.random() < 0.2) {
+      if (chance(0.2)) {
         p.happiness = clamp(p.happiness - 3);
         L(s, p, "event", "You threw a party. The photo in the wrong group chat is now a national document.");
       } else {
@@ -99,33 +105,34 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       }
       break;
     case "invest": {
-      p.money -= 10000;
-      const r = Math.random();
+      p.money -= nominal(10000, s.worldYear);
+      const r = random();
       if (r < 0.55) {
-        p.money += 12000;
+        p.money += nominal(12000, s.worldYear);
         L(s, p, "money", "Your investment grew 12%. It worked the year you weren't watching, like all good employees.");
-        toast(s, "+$12K. The money worked.");
+        toast(s, "+20%. The money worked.");
       } else if (r < 0.8) {
-        p.money += 12500;
+        p.money += nominal(12500, s.worldYear);
         L(s, p, "money", "Your investment surprised everyone, including its lawyers: +25%.");
-        toast(s, "+$25K. Unreasonably good.");
+        toast(s, "+25%. Unreasonably good.");
       } else {
-        p.money -= 3000;
+        p.money -= nominal(3000, s.worldYear);
         L(s, p, "money", "Your investment shrank 30%. The charts are just a picture, the picture is just a memory.");
-        toast(s, "-$3K. Charts are just pictures.");
+        toast(s, "-30%. Charts are just pictures.");
       }
       break;
     }
     case "lottery": {
-      p.money -= 20;
-      const r = Math.random();
+      p.money -= nominal(20, s.worldYear);
+      const r = random();
       if (r < 0.002) {
-        p.money += 100000;
+        const win = nominal(100000, s.worldYear);
+        p.money += win;
         p.milestones.push({ year: s.worldYear, age: p.age, text: "The lottery" });
         L(s, p, "milestone", "The lottery numbers matched. All of them. Check the ticket again. Do it.");
         toast(s, "THE NUMBERS MATCHED.");
       } else if (r < 0.06) {
-        p.money += 40;
+        p.money += nominal(40, s.worldYear);
         L(s, p, "good", "The lottery paid out $40. Small, loud, personal.");
       } else {
         L(s, p, "neutral", "The lottery numbers came in. They were not your numbers. They were everyone else's numbers.");
@@ -133,31 +140,41 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       break;
     }
     case "car": {
-      p.money -= 28000;
+      const price = nominal(28000, s.worldYear);
+      p.money -= price;
       const name = pick(CARS);
-      p.car = { name, value: 28000 };
+      p.car = { name, value: price };
       L(s, p, "good", `You bought ${name}. The first drive home was a small ceremony.`);
       p.milestones.push({ year: s.worldYear, age: p.age, text: "Bought a car" });
       break;
     }
     case "house": {
-      const price = Math.round(160000 * country(p.countryId).costIndex);
+      const price = nominal(Math.round(160000 * country(p.countryId).costIndex), s.worldYear);
       const down = Math.round(price * 0.3);
       p.money -= down;
-      p.debts += price - down;
+      takeLoan(p, "mortgage", price - down, s.worldYear);
       p.house = { value: price, city: p.city };
-      L(s, p, "milestone", `You bought a house in ${p.city}. The keys were warm from the lock.`);
+      L(s, p, "milestone", `You bought a house in ${p.city}. The keys were warm from the lock. The mortgage has your name and a long memory.`);
       p.milestones.push({ year: s.worldYear, age: p.age, text: `Bought a house in ${p.city}` });
       break;
     }
+    case "relocate": {
+      const destCity = opt && country(p.countryId).cities.includes(opt) ? opt : pick(country(p.countryId).cities.filter((x) => x !== p.city));
+      const fee = nominal(2500, s.worldYear);
+      p.money -= fee;
+      p.city = destCity;
+      L(s, p, "family", `You moved to ${destCity}. Same country, new postcode, new bakery to become a regular at.`);
+      p.milestones.push({ year: s.worldYear, age: p.age, text: `Moved to ${destCity}` });
+      break;
+    }
     case "vacation": {
-      p.money -= 3000;
+      p.money -= nominal(3000, s.worldYear);
       p.happiness = clamp(p.happiness + 9);
       L(s, p, "good", "You took a vacation. You came back quieter, and somehow louder inside.");
       break;
     }
     case "gift": {
-      p.money -= 200;
+      p.money -= nominal(200, s.worldYear);
       const kidId = p.childrenIds[0];
       const kid = s.chars[kidId];
       if (kid) {
@@ -167,9 +184,10 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       break;
     }
     case "date": {
-      const cand = makeNpcPerson(s, p.age + Math.floor(Math.random() * 9) - 4, p.countryId);
+      // The candidate only enters the world if the date works.
+      const cand = makeNpcPerson(s, p.age + Math.floor(random() * 9) - 4, p.countryId, p.group);
       const c = 0.35 + p.looks / 250 + p.happiness / 400 + (p.traits.includes("charming") ? 0.1 : 0);
-      if (Math.random() < c) {
+      if (random() < c) {
         p.partnerId = cand.id;
         cand.partnerId = p.id;
         p.partnerSince = s.worldYear;
@@ -178,8 +196,9 @@ export function doAction(s: GameState, id: string, opt?: string): void {
         L(s, p, "family", `You and ${cand.firstName} have been going out since that one night. The playlists are already shared.`);
         toast(s, `You and ${cand.firstName} are going out.`);
       } else {
+        delete s.chars[cand.id]; // rejected strangers don't accumulate in the world
         p.happiness = clamp(p.happiness - 2);
-        L(s, p, "neutral", `${cand.firstName} liked you — as a friend? a person? unclear. No harm done. The playlist stays yours.`);
+        L(s, p, "neutral", "They liked you — as a friend? a person? unclear. No harm done. The playlist stays yours.");
         toast(s, "Not this one. The next one is closer.");
       }
       break;
@@ -197,7 +216,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       const par = s.chars[p.partnerId ?? ""];
       if (!par) break;
       const c = 0.45 + (p.partnerValue ?? 65) / 120 + (p.traits.includes("charming") ? 0.05 : 0);
-      if (Math.random() < c) {
+      if (random() < c) {
         p.flags.push("married");
         par.flags.push("married");
         p.happiness = clamp(p.happiness + 10);
@@ -227,9 +246,13 @@ export function doAction(s: GameState, id: string, opt?: string): void {
     case "baby": {
       const par = s.chars[p.partnerId ?? ""];
       if (!par) break;
-      const mother = p.gender === "female" ? p : par;
-      const father = p.gender === "female" ? par : p;
-      if (Math.random() < 0.4) {
+      const mother = p.gender === "female" ? p : par.gender === "female" ? par : undefined;
+      if (!mother) {
+        L(s, p, "neutral", "You two make plans and scrapbooks instead; the adoption office keeps the door open.");
+        break;
+      }
+      const father = mother === p ? par : p;
+      if (random() < 0.4) {
         const child = createChild(s, mother, father);
         p.milestones.push({ year: s.worldYear, age: p.age, text: `Welcomed ${child.firstName}` });
         p.happiness = clamp(p.happiness + 8);
@@ -240,11 +263,12 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       break;
     }
     case "adopt": {
-      if (Math.random() < 0.6) {
-        p.money -= 8000;
+      if (random() < 0.6) {
+        p.money -= nominal(8000, s.worldYear);
         const origin = pick(COUNTRY_LIST.filter((c) => c.id !== p.countryId));
-        const mother = p.gender === "female" ? p : s.chars[p.partnerId ?? ""] ?? p;
-        const father = p.gender === "female" ? (s.chars[p.partnerId ?? ""] ?? p) : p;
+        const par = s.chars[p.partnerId ?? ""];
+        const mother = p.gender === "female" ? p : par ?? p;
+        const father = p.gender === "female" ? par ?? p : p;
         const child = createChild(s, mother, father, origin.id);
         p.milestones.push({ year: s.worldYear, age: p.age, text: `Adopted ${child.firstName}` });
         L(s, p, "family", `You adopted ${child.firstName} from ${origin.name}. The paperwork took months; the love took about five minutes.`);
@@ -281,11 +305,11 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       const j = p.job;
       if (!j) break;
       const c = 0.35 + p.smarts / 400 + (p.traits.includes("ambitious") ? 0.05 : 0);
-      if (j.seniority < 3 && Math.random() < c) {
+      if (j.seniority < 3 && random() < c) {
         j.seniority++;
         const def = JOBS[j.jobId];
-        if (def) j.salary = jobSalary(def, p, j.seniority);
-        L(s, p, "good", `You got the promotion. The new title is longer; the coffee is better; the blame is heavier.`);
+        if (def) j.salary = nominalSalary(p, def, j.seniority, s.worldYear);
+        L(s, p, "good", "You got the promotion. The new title is longer; the coffee is better; the blame is heavier.");
       } else if (j.seniority >= 3) {
         L(s, p, "neutral", "You're at the top of this ladder. The view is better; the meetings are longer.");
       } else {
@@ -300,9 +324,17 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       break;
     case "uni-enroll": {
       if (p.uni || p.education === "university" || (p.examScore ?? 0) < 55 || p.job) break;
-      p.uni = { year: 1, major: suggestedMajor(p), gpa: 50 };
+      const major = p.plannedMajor ?? suggestedMajor(p);
+      p.uni = { year: 1, major, gpa: 50 };
       p.milestones.push({ year: s.worldYear, age: p.age, text: "Back to university" });
       L(s, p, "good", `You enrolled in ${MAJOR_LIST.find((m) => m.id === p.uni!.major)?.name}. The classroom is new again — in the best way.`);
+      break;
+    }
+    case "drop-uni": {
+      if (!p.uni) break;
+      const major = p.uni.major;
+      p.uni = null;
+      L(s, p, "bad", `You dropped out of ${MAJOR_LIST.find((m) => m.id === major)?.name ?? major}. The door stays open; so does the risk.`);
       break;
     }
     case "retire": {
@@ -321,27 +353,36 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       const name = LANGS[lang]?.name ?? lang;
       const before = p.languages[lang] ?? 0;
       const gain = 10 + (p.smarts > 70 ? 4 : 0) + (p.age < 18 ? 4 : 0);
-      p.languages[lang] = clamp(before + gain, 0, 98);
-      if (before < 50 && p.languages[lang] >= 50) {
+      const after = clamp(before + gain, 0, 98);
+      p.languages[lang] = after;
+      const convFlag = `lang-conv-${lang}`;
+      const fluentFlag = `lang-fluent-${lang}`;
+      if (before < 50 && after >= 50 && !p.flags.includes(convFlag)) {
+        p.flags.push(convFlag);
+        p.milestones.push({ year: s.worldYear, age: p.age, text: `Conversant in ${name}` });
+        L(s, p, "milestone", `You're ${proficiencyLabel(50)} in ${name} now. Small talk, in another key, unlocked.`);
+      } else if (before < 80 && after >= 80 && !p.flags.includes(fluentFlag)) {
+        p.flags.push(fluentFlag);
         p.milestones.push({ year: s.worldYear, age: p.age, text: `Fluent in ${name}` });
-        L(s, p, "milestone", `You're actually fluent in ${name} now. Small talk, in another key, unlocked.`);
-        if (p.flags.includes("immigrant") && lang === country(p.countryId).languages[0]) {
-          p.flags = p.flags.filter((f) => f !== "immigrant");
-        }
+        L(s, p, "milestone", `You're ${proficiencyLabel(80)} in ${name}. Dreams now arrive with subtitles occasionally.`);
       } else {
-        L(s, p, "neutral", `You studied ${name}. The verb conjugations are still a personal enemy.`);
+        L(s, p, "neutral", `You studied ${name}. The verb conjugations are still a personal enemy. (${proficiencyLabel(after)})`);
+      }
+      if (p.flags.includes("immigrant") && lang === country(p.countryId).languages[0] && after >= 50) {
+        p.flags = p.flags.filter((f) => f !== "immigrant");
       }
       break;
     }
     case "emigrate": {
       const dest = opt ? country(opt) : undefined;
       if (!dest || dest.id === p.countryId) break;
-      p.money -= 12000;
+      p.money -= nominal(12000, s.worldYear);
       const move = [p, s.chars[p.partnerId ?? ""], ...p.childrenIds.map((i) => s.chars[i])].filter((x): x is Char => !!x && x.alive);
       for (const m of move) {
         m.countryId = dest.id;
         m.city = pick(dest.cities);
         if (!m.flags.includes("immigrant")) m.flags.push("immigrant");
+        m.arrivedYear = s.worldYear;
       }
       p.flags.push(`emig-${s.worldYear}`);
       p.happiness = clamp(p.happiness - 8);
@@ -356,5 +397,16 @@ export function doAction(s: GameState, id: string, opt?: string): void {
     default:
       break;
   }
+  // Whole-dollar wallets that can never go negative, even if an action cost
+  // was set without a matching actionLock entry.
+  if (p.money !== moneyBefore) p.money = Math.max(0, Math.round(p.money));
   markUsed(p, id === "apply" ? "jobhunt" : id);
 }
+
+// Re-exported for UI components that want the era-adjusted house down payment.
+export function houseDownPayment(p: Char): number {
+  const year = p.birthYear + p.age;
+  return Math.round(nominal(160000 * country(p.countryId).costIndex, year) * 0.3);
+}
+
+export { eraFactor };

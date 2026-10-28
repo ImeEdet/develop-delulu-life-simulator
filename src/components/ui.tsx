@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Char } from "../game/types";
 import { country } from "../game/world";
+import { proficiencyLabel } from "../game/content";
 
 const PATHS: Record<string, string[]> = {
   feather: ["M20 4c-7 0-13 5-15 14l-1 3 3-1c9-2 13-8 13-16z", "M7 17 17 7"],
@@ -111,15 +112,13 @@ export function LangBar({ name, value }: { name: string; value: number }) {
   const v = Math.round(value);
   const color = v >= 80 ? "#5ce8a9" : v >= 50 ? "#a78bfa" : "#ffb054";
   return (
-    <div className="flex items-center gap-2" title={`${name}: ${v}/100`}>
+    <div className="flex items-center gap-2" title={`${name}: ${v}/100 — ${proficiencyLabel(v)}`}>
       <span className="w-24 truncate text-sm font-semibold">{name}</span>
       <div className="flex-1 h-1.5 rounded-full bg-ink overflow-hidden">
         <div className="h-full rounded-full bar-fill" style={{ width: `${Math.max(3, v)}%`, background: color }} />
       </div>
       <span className="text-[11px] font-bold tabular-nums text-dim w-7 text-right">{v}</span>
-      <span className="text-[10px] text-dim w-14">
-        {v >= 80 ? "fluent" : v >= 50 ? "conversant" : v >= 25 ? "basic" : "beginner"}
-      </span>
+      <span className="text-[10px] text-dim w-16">{proficiencyLabel(v)}</span>
     </div>
   );
 }
