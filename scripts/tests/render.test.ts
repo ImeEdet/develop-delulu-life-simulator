@@ -84,6 +84,21 @@ export const tests = [
     },
   },
   {
+    name: "all app icon variants share the generated mark and a refreshed cache URL",
+    fn: () => {
+      const manifest = JSON.parse(readFileSync("public/manifest.webmanifest", "utf8")) as { icons: { src: string }[] };
+      const html = readFileSync("index.html", "utf8");
+      const worker = readFileSync("public/sw.js", "utf8");
+      const generator = readFileSync("scripts/make-icons.mjs", "utf8");
+      const svg = readFileSync("public/icons/icon.svg", "utf8");
+      assert(manifest.icons.length >= 3 && manifest.icons.every((icon) => icon.src.includes("?v=2")), "manifest icons are not pinned to the refreshed icon set");
+      assert(html.includes("apple-touch-icon-180.png?v=2") && html.includes("favicon-32.png?v=2"), "browser/home-screen icon links still reference stale paths");
+      assert(worker.includes("/icons/icon.svg?v=2") && worker.includes("/icons/maskable-512.png?v=2"), "service worker does not precache the refreshed icon paths");
+      assert(generator.includes("const svgRects = D_GLYPH.flatMap") && generator.includes('writeFileSync(join(OUT, "icon.svg"), svgIcon)'), "icon generator does not keep SVG and PNG artwork in sync");
+      assert(svg.includes('<rect x="92" y="92" width="47" height="47"/>'), "SVG app icon does not use the shared bitmap D mark");
+    },
+  },
+  {
     name: "service worker waits for the in-app update command instead of silently replacing the session",
     fn: () => {
       const worker = readFileSync("public/sw.js", "utf8");

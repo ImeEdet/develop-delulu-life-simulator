@@ -41,7 +41,8 @@ function ancestors(s: GameState, c: Char): Set<string> {
   return found;
 }
 
-function related(s: GameState, a: Char, b: Char): boolean {
+export function areFamilyRelated(s: GameState, a: Char, b: Char): boolean {
+  if (a.id === b.id) return true;
   if (a.id === b.motherId || a.id === b.fatherId || b.id === a.motherId || b.id === a.fatherId) return true;
   if (a.childrenIds.includes(b.id) || b.childrenIds.includes(a.id)) return true;
   const aAncestors = ancestors(s, a);
@@ -51,7 +52,7 @@ function related(s: GameState, a: Char, b: Char): boolean {
 
 function isKnown(s: GameState, p: Char, target: Char): boolean {
   return p.partnerId === target.id || p.partnerHistory.includes(target.id) || target.partnerHistory.includes(p.id) ||
-    p.friends.some((f) => f.id === target.id) || related(s, p, target);
+    p.friends.some((f) => f.id === target.id) || areFamilyRelated(s, p, target);
 }
 
 function friendScore(c: Char, id: string): number | undefined {
@@ -82,7 +83,7 @@ function contextAllows(s: GameState, target: Char, action: NpcInteraction): bool
   if (action === "date") {
     const score = friendScore(p, target.id) ?? 0;
     return p.age >= 18 && target.age >= 18 && Math.abs(p.age - target.age) <= 12 &&
-      !p.partnerId && !target.partnerId && !related(s, p, target) &&
+      !p.partnerId && !target.partnerId && !areFamilyRelated(s, p, target) &&
       !p.partnerHistory.includes(target.id) && !target.partnerHistory.includes(p.id) && score >= 15;
   }
   return action === "breakup" && p.partnerId === target.id && target.partnerId === p.id;

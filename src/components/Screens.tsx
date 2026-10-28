@@ -5,7 +5,9 @@ import { JOBS, MAJOR_LIST, SENIORITY, TRAIT_LIST, eligibleJobs, isImmigrant, job
 import { livingCost, netWorth, totalDebt, financialStatus } from "../game/economy";
 import { nominal } from "../game/era";
 import { actionLock } from "../game/actions";
+import { areFamilyRelated } from "../game/social";
 import type { GameApi } from "../game/state";
+import { FamilyTree } from "./FamilyTree";
 import { Chip, CountryTag, I, Portrait, SectionTitle } from "./ui";
 
 export const majorName = (id: string) => MAJOR_LIST.find((m) => m.id === id)?.name ?? id;
@@ -61,6 +63,7 @@ function CharCard({ c, label, showMoney = false, onSelect }: { c: Char; label: s
 }
 
 export function FamilyScreen({ s, onSelectNpc = () => {} }: { s: GameState; onSelectNpc?: (id: string) => void }) {
+  const [showTree, setShowTree] = useState(false);
   const p = s.chars[s.currentId];
   const get = (id?: string) => (id ? s.chars[id] : undefined);
   const mother = get(p.motherId);
@@ -77,13 +80,28 @@ export function FamilyScreen({ s, onSelectNpc = () => {} }: { s: GameState; onSe
   const stepkids = (partner?.childrenIds ?? []).filter((id) => !p.childrenIds.includes(id)).map((id) => s.chars[id]).filter(Boolean);
   const kids = p.childrenIds.map((id) => s.chars[id]).filter(Boolean);
   const grandkids = kids.flatMap((k) => (k.childrenIds ?? []).map((id) => s.chars[id])).filter(Boolean);
-  const friends = p.friends.map((f) => ({ c: s.chars[f.id], value: f.value })).filter((f) => f.c);
+  // Family interactions may use the shared bond record internally, but relatives
+  // belong in their generation sections rather than being duplicated as friends.
+  const friends = p.friends.map((f) => ({ c: s.chars[f.id], value: f.value }))
+    .filter((f): f is { c: Char; value: number } => !!f.c && !areFamilyRelated(s, p, f.c));
 
   return (
     <div className="space-y-6 pb-6">
       <div className="panel-inset p-3 flex items-start gap-2 text-xs text-dim" role="note">
         <I name="users" className="w-4 h-4 text-peach shrink-0 mt-0.5" />
         <p><b className="text-txt">NPC profiles &amp; social actions:</b> tap any family card to open that character's profile, then scroll to Interactions for talk, gifts, dates, and other available actions.</p>
+      </div>
+      <button
+        type="button"
+        className="btn-ghost rounded-xl px-4 py-3 w-full font-bold flex items-center justify-center gap-2"
+        aria-expanded={showTree}
+        aria-controls="family-tree-view"
+        onClick={() => setShowTree((visible) => !visible)}
+      >
+        <I name="users" className="w-4 h-4 text-peach" /> {showTree ? "Hide Family Tree" : "View Family Tree"}
+      </button>
+      <div id="family-tree-view" hidden={!showTree}>
+        {showTree && <FamilyTree s={s} onSelectNpc={onSelectNpc} />}
       </div>
       <section>
         <SectionTitle icon="heart">Parents</SectionTitle>
