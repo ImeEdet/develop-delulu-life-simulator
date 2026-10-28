@@ -3,12 +3,13 @@ import type { GameState } from "../game/types";
 import { COUNTRY_LIST, LANGS, LANG_LIST, country, fmtMoney } from "../game/world";
 import { ACTIONS, TRAIT_LIST } from "../game/content";
 import { actionLock } from "../game/actions";
+import { netWorth } from "../game/economy";
 import type { GameApi } from "../game/state";
 import { Chip, CountryTag, I, LangBar, Modal, Portrait, SectionTitle } from "./ui";
 
 export function ActionsScreen({ s, g }: { s: GameState; g: GameApi }) {
   const p = s.chars[s.currentId];
-  const [picker, setPicker] = useState<null | "lang" | "country">(null);
+  const [picker, setPicker] = useState<null | "lang" | "country" | "city">(null);
   const groups = ["Everyday", "Money", "Relationships", "Bigger Moves"];
 
   return (
@@ -24,16 +25,16 @@ export function ActionsScreen({ s, g }: { s: GameState; g: GameApi }) {
             <SectionTitle icon="spark">{grp}</SectionTitle>
             <div className="grid sm:grid-cols-2 gap-2">
               {acts.map((a) => {
-                const lock = actionLock(s, a.id);
-                const used = p.usedActions.includes(a.id);
-                const openPicker = a.opt ? a.opt.kind : null;
-                return (
-                  <button
-                    key={a.id}
-                    className="panel-inset p-3 text-left hover:border-peach/50 transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
-                    disabled={!!lock}
-                    onClick={() => (openPicker ? setPicker(openPicker as "lang" | "country") : g.act(a.id))}
-                  >
+                    const lock = actionLock(s, a.id);
+                    const used = p.usedActions.includes(a.id);
+                    const openPicker = a.opt ? a.opt.kind : null;
+                    return (
+                      <button
+                        key={a.id}
+                        className="panel-inset p-3 text-left hover:border-peach/50 transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+                        disabled={!!lock}
+                        onClick={() => (openPicker ? setPicker(openPicker as "lang" | "country" | "city") : g.act(a.id))}
+                      >
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2 font-bold text-sm">
                         <span className="text-peach">
@@ -85,6 +86,27 @@ export function ActionsScreen({ s, g }: { s: GameState; g: GameApi }) {
         </Modal>
       )}
 
+      {picker === "city" && (
+        <Modal onClose={() => setPicker(null)}>
+          <h3 className="font-display font-bold text-xl mb-1">Move to a New City</h3>
+          <p className="text-xs text-dim mb-4">Same country, new postcode. Costs about $2.5K in moving fees.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {country(p.countryId).cities.filter((x) => x !== p.city).map((city) => (
+              <button
+                key={city}
+                className="panel-inset p-2.5 text-left hover:border-peach/50 transition-colors"
+                onClick={() => {
+                  g.act("relocate", city);
+                  setPicker(null);
+                }}
+              >
+                <span className="font-bold text-sm">{city}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
       {picker === "country" && (
         <Modal onClose={() => setPicker(null)} wide>
           <h3 className="font-display font-bold text-xl mb-1">Move Abroad</h3>
@@ -128,6 +150,7 @@ const FLAG_LABELS: Record<string, { label: string; color: string }> = {
   married: { label: "Married", color: "pink" },
   divorced: { label: "Divorced", color: "coral" },
   immigrant: { label: "Immigrant", color: "peach" },
+  citizen: { label: "Naturalized Citizen", color: "mint" },
   "old-money": { label: "Old Money", color: "gold" },
   pet: { label: "Pet Parent", color: "mint" },
   band: { label: "Band Member", color: "lav" },
@@ -139,7 +162,7 @@ const FLAG_LABELS: Record<string, { label: string; color: string }> = {
 
 export function ProfileScreen({ s }: { s: GameState }) {
   const p = s.chars[s.currentId];
-  const net = p.money - p.debts + (p.house?.value ?? 0) + (p.car?.value ?? 0);
+  const net = netWorth(p);
   const flags = p.flags.filter((f) => FLAG_LABELS[f]);
   const skills = Object.entries(p.skills).filter(([, v]) => v > 0);
   return (

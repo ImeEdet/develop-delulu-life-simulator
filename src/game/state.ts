@@ -1,68 +1,102 @@
-import { useCallback, useState } from "react";
-import type { CustomSpec, GameState } from "./types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CustomSpec, GameState, SaveMeta } from "./types";
 import { newCustomLife, newRandomLife } from "./characters";
 import { ageUp, continueAs, getEvent } from "./simulate";
 import { runEvent } from "./events";
 import { doAction } from "./actions";
+import { getDriver, type StorageDriver } from "./persistence/storage";
+import {
+  AUTOSAVE_ID, deleteSlot, exportEnvelope, importEnvelope, listSlots, loadSlot,
+  migrateLegacySave, renameSlot, writeSlot,
+} from "./persistence/saves";
 
-const KEY = "delulu-life-save-v1";
-
-export function loadSave(): GameState | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const d = JSON.parse(raw) as GameState;
-    if (d.version !== 1 || !d.chars[d.currentId]) return null;
-    return d;
-  } catch {
-    return null;
-  }
+export interface ImportResult {
+  ok: boolean;
+  error?: string;
 }
 
-export function wipeSave() {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* noop */
-  }
-}
-
-function persist(s: GameState) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(s));
-  } catch {
-    /* storage full or unavailable */
-  }
+function newSlotId(): string {
+  return `slot-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
 export function useGame() {
-  const [state, setState] = useState<GameState | null>(() => loadSave());
+  const driverRef = useRef<StorageDriver | null>(null);
+  const [ready, setReady] = useState(false);
+  const [state, setState] = useState<GameState | null>(null);
+  const [saves, setSaves] = useState<SaveMeta[]>([]);
 
-  const commit = useCallback((fn: (s: GameState) => void) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const next = JSON.parse(JSON.stringify(prev)) as GameState;
-      fn(next);
-      persist(next);
-      return next;
-    });
+  const refreshSaves = useCallback(async () => {
+    if (!driverRef.current) return;
+    setSaves(await listSlots(driverRef.current));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const driver = getDriver();
+      driverRef.current = driver;
+      try {
+        await migrateLegacySave(driver);
+      } catch {
+        /* legacy migration is best-effort */
+      }
+      const slots = await listSlots(driver);
+      if (cancelled) return;
+      setSaves(slots);
+      if (slots.length > 0) {
+        const loaded = await loadSlot(driver, slots[0].id);
+        if (!cancelled && loaded) setState(loaded);
+      }
+      setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const persist = useCallback(
+    async (s: GameState) => {
+      const driver = driverRef.current;
+      if (!driver) return;
+      if (!s.saveSlotId) s.saveSlotId = newSlotId();
+      await writeSlot(driver, s.saveSlotId, s);
+      void refreshSaves();
+    },
+    [refreshSaves]
+  );
+
+  const commit = useCallback(
+    (fn: (s: GameState) => void) => {
+      setState((prev) => {
+        if (!prev) return prev;
+        const next = JSON.parse(JSON.stringify(prev)) as GameState;
+        fn(next);
+        void persist(next);
+        return next;
+      });
+    },
+    [persist]
+  );
+
+  const beginLife = useCallback(
+    (n: GameState) => {
+      n.saveSlotId = newSlotId();
+      void persist(n);
+      setState(n);
+    },
+    [persist]
+  );
 
   const startRandom = useCallback(() => {
-    setState((prev) => {
-      const n = newRandomLife(prev?.livesLived ?? 0);
-      persist(n);
-      return n;
-    });
-  }, []);
+    beginLife(newRandomLife(state?.livesLived ?? 0));
+  }, [beginLife, state]);
 
-  const startCustom = useCallback((spec: CustomSpec) => {
-    setState((prev) => {
-      const n = newCustomLife(spec, prev?.livesLived ?? 0);
-      persist(n);
-      return n;
-    });
-  }, []);
+  const startCustom = useCallback(
+    (spec: CustomSpec) => {
+      beginLife(newCustomLife(spec, state?.livesLived ?? 0));
+    },
+    [beginLife, state]
+  );
 
   const ageUpAction = useCallback(() => commit((s) => ageUp(s)), [commit]);
 
@@ -88,7 +122,86 @@ export function useGame() {
 
   const dismissToast = useCallback(() => commit((s) => (s.toast = null)), [commit]);
 
-  return { state, startRandom, startCustom, ageUpAction, resolve, act, cont, dismissToast };
+  const openSlot = useCallback(
+    async (id: string) => {
+      const driver = driverRef.current;
+      if (!driver) return;
+      const loaded = await loadSlot(driver, id);
+      if (loaded) setState(loaded);
+    },
+    []
+  );
+
+  const renameSave = useCallback(
+    async (id: string, name: string) => {
+      const driver = driverRef.current;
+      if (!driver) return;
+      await renameSlot(driver, id, name);
+      await refreshSaves();
+    },
+    [refreshSaves]
+  );
+
+  const deleteSave = useCallback(
+    async (id: string) => {
+      const driver = driverRef.current;
+      if (!driver) return;
+      await deleteSlot(driver, id);
+      if (state?.saveSlotId === id) setState(null);
+      await refreshSaves();
+    },
+    [refreshSaves, state]
+  );
+
+  const exportSave = useCallback((): string | null => {
+    if (!state) return null;
+    return exportEnvelope(state);
+  }, [state]);
+
+  const importSave = useCallback(
+    async (json: string): Promise<ImportResult> => {
+      const driver = driverRef.current;
+      if (!driver) return { ok: false, error: "Storage is not ready yet." };
+      const result = importEnvelope(json);
+      if (!result.ok || !result.state) {
+        return { ok: false, error: result.errors.join(" ") };
+      }
+      const n = result.state;
+      n.saveSlotId = newSlotId();
+      await writeSlot(driver, n.saveSlotId, n, `Imported — ${n.chars[n.currentId]?.firstName ?? "life"}`);
+      await refreshSaves();
+      setState(n);
+      return { ok: true };
+    },
+    [refreshSaves]
+  );
+
+  const endLineage = useCallback(() => setState(null), []);
+
+  const quickSave = useCallback(() => {
+    if (state) void persist(state);
+  }, [state, persist]);
+
+  return {
+    ready,
+    state,
+    saves,
+    startRandom,
+    startCustom,
+    ageUpAction,
+    resolve,
+    act,
+    cont,
+    dismissToast,
+    openSlot,
+    renameSave,
+    deleteSave,
+    exportSave,
+    importSave,
+    endLineage,
+    quickSave,
+    autosaveId: AUTOSAVE_ID,
+  };
 }
 
 export type GameApi = ReturnType<typeof useGame>;

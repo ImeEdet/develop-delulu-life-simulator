@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { country, fmtMoney } from "../game/world";
 import { JOBS, SENIORITY, TRAIT_LIST } from "../game/content";
+import { eligibleSuccessors } from "../game/simulate";
+import { netWorth } from "../game/economy";
 import type { GameApi } from "../game/state";
 import { Chip, CountryTag, I, Modal, Portrait, StatBar } from "./ui";
 import { Journal } from "./Journal";
@@ -166,16 +168,16 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
       )}
 
       {/* Death overlay */}
-      {s.over && <DeathScreen g={g} />}
+      {s.over && <DeathScreen g={g} onMenu={onMenu} />}
     </div>
   );
 }
 
-function DeathScreen({ g }: { g: GameApi }) {
+function DeathScreen({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
   const s = g.state!;
   const p = s.chars[s.currentId];
-  const kids = p.childrenIds.map((id) => s.chars[id]).filter((k) => k && k.alive).sort((a, b) => b.age - a.age);
-  const net = p.money - p.debts + (p.house?.value ?? 0);
+  const kids = eligibleSuccessors(s);
+  const net = netWorth(p);
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-ink">
       <div className="absolute inset-0 bg-dusk" />
@@ -224,10 +226,10 @@ function DeathScreen({ g }: { g: GameApi }) {
           {kids.length > 0 ? (
             <>
               <p className="text-center text-sm text-dim">
-                The story isn't finished. {kids.length} {kids.length === 1 ? "child" : "children"} still carry the {p.lastName} name —
+                The story isn't finished. {kids.length} {kids.length === 1 ? "descendant" : "descendants"} still carry the {p.lastName} name —
                 the inheritance is already in their pockets.
               </p>
-              {kids.map((k) => (
+              {kids.slice(0, 6).map((k) => (
                 <button
                   key={k.id}
                   className="w-full btn-primary rounded-xl px-5 py-4 flex items-center justify-between"
@@ -247,11 +249,22 @@ function DeathScreen({ g }: { g: GameApi }) {
               ))}
             </>
           ) : (
-            <p className="text-center text-sm text-dim">No children carry the name. The story ends — complete.</p>
+            <p className="text-center text-sm text-dim">No descendants carry the name. This story ends — complete.</p>
           )}
-          <button className="w-full btn-ghost rounded-xl px-5 py-3.5 font-bold" onClick={() => g.startRandom()}>
-            Start a New Life
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button className="btn-ghost rounded-xl px-4 py-3.5 font-bold" onClick={onMenu}>
+              End This Lineage
+            </button>
+            <button
+              className="btn-primary rounded-xl px-4 py-3.5 font-bold"
+              onClick={() => {
+                g.startRandom();
+              }}
+            >
+              Start a New Life
+            </button>
+          </div>
+          <p className="text-center text-[11px] text-dim/70">A new life gets its own save slot — this one stays exactly as it is.</p>
         </div>
       </div>
     </div>

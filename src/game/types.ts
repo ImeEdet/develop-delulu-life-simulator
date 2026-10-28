@@ -1,6 +1,9 @@
+import type { NameUsage } from "./names";
+
 export type Gender = "male" | "female";
 export type EducationLevel = "none" | "primary" | "secondary" | "university";
 export type Stage = "child" | "teen" | "adult" | "senior";
+export type NameOrder = "first-last" | "last-first";
 
 export type LogKind =
   | "birth"
@@ -20,14 +23,23 @@ export interface CountryDef {
   name: string;
   code: string;
   colors: [string, string];
-  languages: string[]; // first = native
+  languages: string[]; // first = primary/official language
   currency: { symbol: string; rate: number };
   wageIndex: number;
   costIndex: number;
-  uniCost: number; // USD per year
+  uniCost: number; // modern USD per year
   eduQuality: number;
   safety: number;
-  culture: string;
+  culture: string; // V1 coarse culture key (kept for compatibility)
+  /** V2 cultural/naming groups available inside this country. */
+  groups: string[];
+  nameOrder: NameOrder;
+  /** Country-specific education pathway. */
+  schoolStart: number;
+  secondaryStart: number;
+  examAge: number;
+  uniYears: number;
+  retireAge: number;
   cities: string[];
   blurb: string;
 }
@@ -53,9 +65,11 @@ export interface JobDef {
   title: string;
   minAge: number;
   edu: "none" | "secondary" | "university";
-  salary: number; // USD base
+  salary: number; // modern (2023-ish) USD base
   smartsReq: number;
   unstable?: boolean;
+  publicSector?: boolean;
+  trade?: boolean;
   majors?: string[];
   desc: string;
 }
@@ -63,13 +77,22 @@ export interface JobDef {
 export interface Job {
   jobId: string;
   seniority: number; // 0..3
-  salary: number;
+  salary: number; // nominal USD for the current world year
   years: number;
   employer: string;
 }
 
+export interface Loan {
+  id: string;
+  kind: "student" | "mortgage" | "personal";
+  principal: number;
+  balance: number;
+  rate: number; // annual interest, e.g. 0.05
+  yearTaken: number;
+}
+
 export interface UniInfo {
-  year: number; // 1..4
+  year: number; // 1..N
   major: string;
   gpa: number; // 0..100
 }
@@ -78,6 +101,8 @@ export interface Char {
   id: string;
   firstName: string;
   lastName: string;
+  /** Cultural naming group id (see name-data.ts). */
+  group?: string;
   gender: Gender;
   birthYear: number;
   age: number;
@@ -93,8 +118,11 @@ export interface Char {
   smarts: number;
   looks: number;
   traits: string[];
+  /** Personal cash + savings. Household wealth lives with the parents. */
   money: number;
+  /** Kept in sync with the sum of loan balances (V1 compatibility field). */
   debts: number;
+  loans: Loan[];
   pension: number;
   house?: { value: number; city: string };
   car?: { name: string; value: number };
@@ -109,6 +137,8 @@ export interface Char {
   education: EducationLevel;
   uni: UniInfo | null;
   examScore?: number;
+  /** Major suggested at the crossroads — pinned so text and choices agree. */
+  plannedMajor?: string;
   job: Job | null;
   retired: boolean;
   languages: Record<string, number>;
@@ -117,7 +147,11 @@ export interface Char {
   milestones: { year: number; age: number; text: string }[];
   usedActions: string[];
   eventCooldowns: Record<string, number>;
-  wealthTier?: number; // 0 poor · 1 comfortable · 2 well-off · 3 wealthy
+  /** 0 disadvantaged · 1 working-class · 2 comfortable · 3 wealthy · 4 elite. */
+  wealthTier?: number;
+  /** Immigration bookkeeping: when this person arrived in their current country. */
+  arrivedYear?: number;
+  citizenOf?: string; // country id of citizenship
 }
 
 export interface LogEntry {
@@ -148,6 +182,7 @@ export interface Toast {
 
 export interface GameState {
   version: number;
+  seed?: number;
   startYear: number;
   worldYear: number;
   currentId: string;
@@ -160,6 +195,9 @@ export interface GameState {
   over: boolean;
   overText?: string;
   toast?: Toast | null;
+  nameUsage: NameUsage;
+  /** Save slot this life is bound to (set by the persistence layer). */
+  saveSlotId?: string;
 }
 
 export interface EventCtx {
@@ -181,6 +219,9 @@ export interface LifeEvent {
   scripted?: boolean; // only pushed by the simulation, never rolled randomly
   minAge: number;
   maxAge: number;
+  /** Era gating: smartphones, social media, crypto, etc. */
+  minYear?: number;
+  maxYear?: number;
   once?: boolean;
   cool?: number; // years cooldown after firing
   when?: (e: EventCtx) => boolean;
@@ -203,12 +244,43 @@ export interface ParentSpec {
 
 export interface CustomSpec {
   firstName: string;
+  surname: string; // empty string => generated
   gender: Gender;
   countryId: string;
+  group?: string;
+  city: string; // empty string => random
+  birthYear?: number; // empty/undefined => random within era limits
   traits: string[];
+  /** 0 disadvantaged · 1 working-class · 2 comfortable · 3 wealthy · 4 elite. */
   wealthTier: number;
   parentStatus: "together" | "apart";
   mother?: ParentSpec;
   father?: ParentSpec;
   siblings: SiblingSpec[];
+  designFamily: boolean;
+}
+
+/** Persistence envelope used by export/import. */
+export interface SaveEnvelope {
+  app: "delulu-life";
+  schema: number;
+  exportedAt: number;
+  state: GameState;
+}
+
+export interface SaveMeta {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  characterName: string;
+  age: number;
+  year: number;
+  generation: number;
+  alive: boolean;
+  countryId: string;
+}
+
+export interface SaveSlot extends SaveMeta {
+  state: GameState;
 }
