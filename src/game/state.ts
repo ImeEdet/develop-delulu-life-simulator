@@ -4,6 +4,7 @@ import { newCustomLife, newRandomLife } from "./characters";
 import { ageUp, continueAs, getEvent } from "./simulate";
 import { runEvent } from "./events";
 import { doAction } from "./actions";
+import { interactWithNpc, type NpcInteraction } from "./social";
 import { getDriver, type StorageDriver } from "./persistence/storage";
 import {
   AUTOSAVE_ID, deleteSlot, exportEnvelope, importEnvelope, listSlots, loadSlot,
@@ -118,6 +119,11 @@ export function useGame() {
     [commit]
   );
 
+  const interactNpc = useCallback(
+    (targetId: string, action: NpcInteraction) => commit((s) => interactWithNpc(s, targetId, action)),
+    [commit]
+  );
+
   const cont = useCallback((id: string) => commit((s) => continueAs(s, id)), [commit]);
 
   const dismissToast = useCallback(() => commit((s) => (s.toast = null)), [commit]);
@@ -191,6 +197,7 @@ export function useGame() {
     ageUpAction,
     resolve,
     act,
+    interactNpc,
     cont,
     dismissToast,
     openSlot,

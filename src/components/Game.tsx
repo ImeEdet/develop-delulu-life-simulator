@@ -8,6 +8,7 @@ import { Chip, CountryTag, I, Modal, Portrait, StatBar } from "./ui";
 import { Journal } from "./Journal";
 import { FamilyScreen, MoneyScreen, WorkScreen } from "./Screens";
 import { ActionsScreen, ProfileScreen } from "./Screens2";
+import { NpcProfile } from "./NpcProfile";
 
 const TABS = [
   { id: "life", label: "Life", icon: "feather" },
@@ -22,6 +23,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
   const s = g.state!;
   const p = s.chars[s.currentId];
   const [tab, setTab] = useState("life");
+  const [npcId, setNpcId] = useState<string | null>(null);
   const c = country(p.countryId);
   const pending = s.pending[0];
 
@@ -90,7 +92,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
         {/* Content */}
         <main className="anim-rise" key={tab}>
           {tab === "life" && <Journal entries={s.log} />}
-          {tab === "family" && <FamilyScreen s={s} />}
+          {tab === "family" && <FamilyScreen s={s} onSelectNpc={setNpcId} />}
           {tab === "work" && <WorkScreen s={s} g={g} />}
           {tab === "money" && <MoneyScreen s={s} g={g} />}
           {tab === "actions" && <ActionsScreen s={s} g={g} />}
@@ -165,6 +167,10 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
             {s.toast.text}
           </div>
         </div>
+      )}
+
+      {npcId && !s.over && (
+        <NpcProfile s={s} g={g} targetId={npcId} onClose={() => setNpcId(null)} />
       )}
 
       {/* Death overlay */}
