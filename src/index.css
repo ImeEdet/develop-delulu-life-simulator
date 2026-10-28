@@ -21,10 +21,16 @@
 
 html,
 body {
+  width: 100%;
+  min-height: 100%;
+}
+
+html {
   height: 100%;
 }
 
 body {
+  margin: 0;
   font-family: var(--font-body);
   background-color: var(--color-ink);
   color: var(--color-txt);
@@ -154,6 +160,20 @@ input[type="range"] {
 
 html {
   -webkit-text-size-adjust: 100%;
+  color-scheme: dark;
+}
+
+#root {
+  min-height: 100%;
+  overflow-x: clip;
+}
+
+/* Android Chrome and installed PWAs use a changing viewport as browser UI opens/closes. */
+@supports (min-height: 100dvh) {
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
 }
 
 /* Touch targets stay comfortable on phones. */
