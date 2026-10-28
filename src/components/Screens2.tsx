@@ -273,16 +273,16 @@ export function ProfileScreen({ s, g }: { s: GameState; g: GameApi }) {
 
       <section className="panel p-4">
         <SectionTitle icon="spark">Settings · appearance</SectionTitle>
-        <p className="text-xs text-dim mb-3">Auto follows the fame threshold. You can keep the classic colors or use the warm gold palette regardless of fame.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {(["auto", "classic", "gold"] as const).map((preference) => {
+        <p className="text-xs text-dim mb-3">Auto uses electric blue in Super Life and the fame palette in ordinary lives. You can override either look at any time.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {(["auto", "classic", "gold", "super"] as const).map((preference) => {
             const selected = (s.themePreference ?? "auto") === preference;
-            return <button key={preference} aria-pressed={selected} onClick={() => g.setThemePreference(preference)} className={`rounded-lg border px-3 py-2.5 text-sm font-bold ${selected ? "border-peach bg-peach/15 text-peach" : "border-line bg-ink3 text-dim"}`}>
-              {preference === "auto" ? "Auto · fame at 35" : preference === "classic" ? "Classic" : "Gold / champagne"}
+            return <button key={preference} aria-pressed={selected} onClick={() => g.setThemePreference(preference)} className={`min-h-11 rounded-lg border px-3 py-2.5 text-sm font-bold ${selected ? "border-peach bg-peach/15 text-peach" : "border-line bg-ink3 text-dim"}`}>
+              {preference === "auto" ? "Auto" : preference === "classic" ? "Classic" : preference === "gold" ? "Gold" : "Electric blue"}
             </button>;
           })}
         </div>
-        <p className="text-[11px] text-dim mt-2">Currently showing {isGoldTheme(p, s.themePreference ?? "auto") ? "gold / champagne" : "classic"} colors.</p>
+        <p className="text-[11px] text-dim mt-2">Currently showing {(s.themePreference === "super" || (s.themePreference !== "classic" && s.themePreference !== "gold" && s.worldType === "superlife")) ? "electric blue / midnight navy" : isGoldTheme(p, s.themePreference ?? "auto") ? "gold / champagne" : "classic"} colors.</p>
       </section>
 
       <section>

@@ -1,4 +1,4 @@
-import type { Char, CustomSpec, GameState, Gender, JobDef } from "./types";
+import type { Char, CustomSpec, GameState, Gender, JobDef, SuperLifeSpec } from "./types";
 import { country, COUNTRY_LIST } from "./world";
 import { JOBS, TRAITS, TRAIT_LIST, jobSalary } from "./content";
 import { nominal } from "./economy";
@@ -7,6 +7,7 @@ import {
   customOrGenerated, fullName, legacyGroupId, makeFirstName, makeIdentity, makeSurname,
   rollGender, type NameUsage,
 } from "./names";
+import { initialSuperProfile, inheritSuperPower, seedSuperFamily } from "./super";
 
 // Re-export the engine randomness under the V1 import surface.
 export { chance, clamp, pick, ri, fullName };
@@ -196,7 +197,7 @@ const TIER_NAMES = [
 export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
   const startYear = clamp(spec.birthYear ?? ri(1948, 1990), MIN_BIRTH_YEAR, MAX_BIRTH_YEAR);
   const s: GameState = {
-    version: 2,
+    version: 3,
     startYear,
     worldYear: startYear,
     currentId: "",
@@ -409,6 +410,15 @@ export function newRandomLife(prevLives: number): GameState {
   return newCustomLife(buildRandomSpec(), prevLives);
 }
 
+export function newSuperLife(spec: SuperLifeSpec, prevLives: number): GameState {
+  const state = newCustomLife(spec, prevLives);
+  state.worldType = "superlife";
+  const player = state.chars[state.currentId];
+  const profile = initialSuperProfile(spec.superLife);
+  seedSuperFamily(state, player, spec.superLife.familyBackground, profile);
+  return state;
+}
+
 export function createChild(s: GameState, mother: Char, father: Char, originCountryId?: string): Char {
   const gender = rollGender();
   const origin = originCountryId ? country(originCountryId) : null;
@@ -471,6 +481,7 @@ export function createChild(s: GameState, mother: Char, father: Char, originCoun
   }
   if (!mother.childrenIds.includes(child.id)) mother.childrenIds.push(child.id);
   if (father !== mother && !father.childrenIds.includes(child.id)) father.childrenIds.push(child.id);
+  inheritSuperPower(s, child, mother, father);
   return child;
 }
 

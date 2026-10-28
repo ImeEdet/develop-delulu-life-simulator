@@ -51,7 +51,7 @@ export const tests = [
       const r = importEnvelope(json);
       assert(r.ok && r.state, "import failed");
       assertEqual(r.state!.worldYear, s.worldYear, "year mismatch");
-      assertEqual(r.state!.version, 2, "schema not stamped v2");
+      assertEqual(r.state!.version, 3, "schema not stamped v3");
       // migration intentionally normalizes missing fields, so compare both
       // after running the same normalization pass.
       const normalized = validateState(s).state!;
@@ -86,7 +86,7 @@ export const tests = [
       assert(p.loans.length === 1 && p.loans[0].balance === 5000, "V1 debt not converted to a loan");
       assert(!!p.group && !!p.citizenOf, "group/citizenship backfill failed");
       assert(p.culturalHeritage?.includes(p.group), "legacy cultural heritage fallback failed");
-      assertEqual(state.version, 2, "version bumped");
+      assertEqual(state.version, 3, "version bumped");
     },
   },
   {

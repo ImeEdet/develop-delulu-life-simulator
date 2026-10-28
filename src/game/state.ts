@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CustomSpec, GameState, SaveMeta } from "./types";
-import { newCustomLife, newRandomLife } from "./characters";
+import type { CustomSpec, GameState, SaveMeta, SuperLifeSpec } from "./types";
+import { newCustomLife, newRandomLife, newSuperLife } from "./characters";
 import { ageUp, continueAs, getEvent } from "./simulate";
 import { runEvent } from "./events";
 import { doAction } from "./actions";
@@ -8,6 +8,7 @@ import { interactWithNpc, type NpcInteraction } from "./social";
 import { practiceSkill } from "./skills";
 import { performSportAction, type SportAction } from "./sports";
 import { performFameAction, type FameAction } from "./fame";
+import { performSuperAction, resolveSuperAwakening, type SuperAction } from "./super";
 import type { ThemePreference } from "./types";
 import { getDriver, type StorageDriver } from "./persistence/storage";
 import {
@@ -103,6 +104,15 @@ export function useGame() {
     [beginLife, state]
   );
 
+  const startSuperLife = useCallback(
+    (spec: SuperLifeSpec) => {
+      beginLife(newSuperLife(spec, state?.livesLived ?? 0));
+    },
+    [beginLife, state]
+  );
+
+  const superAction = useCallback((action: SuperAction) => commit((s) => performSuperAction(s, action)), [commit]);
+
   const ageUpAction = useCallback(() => commit((s) => ageUp(s)), [commit]);
 
   const resolve = useCallback(
@@ -112,6 +122,10 @@ export function useGame() {
         if (!pc) return;
         s.pending.shift();
         const p = s.chars[s.currentId];
+        if (pc.eventId === "super-awakening") {
+          resolveSuperAwakening(s, p, choiceId);
+          return;
+        }
         const ev = getEvent(pc.eventId);
         if (ev) runEvent(s, p, ev, choiceId);
       }),
@@ -203,6 +217,8 @@ export function useGame() {
     saves,
     startRandom,
     startCustom,
+    startSuperLife,
+    superAction,
     ageUpAction,
     resolve,
     act,

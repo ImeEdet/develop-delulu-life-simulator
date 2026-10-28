@@ -26,7 +26,7 @@ export default function App() {
 
   if (!g.ready) {
     return (
-      <div className={update.updateAvailable ? "pt-20" : ""}>
+<div className={update.updateAvailable ? "has-update-banner" : ""}>
         <div className="relative min-h-screen bg-dusk flex items-center justify-center">
           <div className="stars" />
           <p className="relative z-10 font-display font-bold text-2xl text-dim animate-pulse">Delulu Life is waking up…</p>
@@ -37,7 +37,7 @@ export default function App() {
   }
 
   if (view === "game" && g.state) {
-    return <div className={update.updateAvailable ? "pt-20" : ""}><Game g={g} onMenu={() => navigate("menu")} />{updateBanner}</div>;
+    return <div className={update.updateAvailable ? "has-update-banner" : ""}><Game g={g} onMenu={() => navigate("menu")} />{updateBanner}</div>;
   }
-  return <div className={update.updateAvailable ? "pt-20" : ""}><Menu g={g} onPlay={() => navigate("game")} />{updateBanner}</div>;
+  return <div className={update.updateAvailable ? "has-update-banner" : ""}><Menu g={g} onPlay={() => navigate("game")} />{updateBanner}</div>;
 }

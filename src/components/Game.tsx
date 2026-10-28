@@ -11,6 +11,7 @@ import { ActionsScreen, ProfileScreen } from "./Screens2";
 import { NpcProfile } from "./NpcProfile";
 import { SkillsScreen, SportsScreen, FameScreen } from "./Screens3";
 import { isGoldTheme } from "../game/fame";
+import { SuperScreen } from "./Screens4";
 
 const TABS = [
   { id: "life", label: "Life", icon: "feather" },
@@ -31,10 +32,13 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
   const [npcId, setNpcId] = useState<string | null>(null);
   const c = country(p.countryId);
   const pending = s.pending[0];
-  const goldTheme = isGoldTheme(p, s.themePreference ?? "auto");
+  const preference = s.themePreference ?? "auto";
+  const superTheme = preference === "super" || (preference === "auto" && s.worldType === "superlife");
+  const goldTheme = !superTheme && isGoldTheme(p, preference);
+  const tabs = s.worldType === "superlife" ? [...TABS.slice(0, 5), { id: "super", label: "Super", icon: "spark" }, ...TABS.slice(5)] : TABS;
 
   return (
-    <div className={`relative min-h-screen bg-dusk ${goldTheme ? "theme-gold" : ""}`}>
+    <div className={`relative min-h-screen bg-dusk ${superTheme ? "theme-super" : goldTheme ? "theme-gold" : ""}`}>
       <div className="stars" />
       <div className="relative z-10 max-w-2xl mx-auto px-3 sm:px-4 pb-28">
         {/* Header */}
@@ -81,7 +85,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
 
         {/* Tabs */}
         <nav className="flex gap-1.5 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -102,6 +106,7 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
           {tab === "work" && <WorkScreen s={s} g={g} />}
           {tab === "money" && <MoneyScreen s={s} g={g} />}
           {tab === "actions" && <ActionsScreen s={s} g={g} />}
+          {tab === "super" && <SuperScreen s={s} g={g} />}
           {tab === "skills" && <SkillsScreen s={s} g={g} />}
           {tab === "sports" && <SportsScreen s={s} g={g} />}
           {tab === "fame" && <FameScreen s={s} g={g} />}

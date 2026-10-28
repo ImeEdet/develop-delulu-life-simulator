@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { CustomSpec, Gender, SaveMeta } from "../game/types";
+import type { CustomSpec, Gender, SaveMeta, SuperLifeOptions, SuperLifeSpec } from "../game/types";
 import { COUNTRY_LIST, LANGS, country } from "../game/world";
 import { TRAIT_LIST } from "../game/content";
 import { TIER_BLURBS, TIER_LABELS } from "../game/economy";
@@ -7,10 +7,11 @@ import { buildRandomSpec, MAX_BIRTH_YEAR, MIN_BIRTH_YEAR } from "../game/charact
 import { groupsForCountry, makeFirstName, makeSurname, rollGender } from "../game/names";
 import { NAME_GROUPS } from "../game/name-data";
 import { ri } from "../game/rng";
+import { POWER_BY_ID, SUPER_POWERS, powerTier, randomSuperOptions } from "../game/super";
 import type { GameApi } from "../game/state";
 import { Chip, DiceBtn, I, SectionTitle } from "./ui";
 
-type Screen = "menu" | "random" | "custom" | "howto" | "saves";
+type Screen = "menu" | "random" | "custom" | "super" | "super-random" | "super-custom" | "howto" | "saves";
 
 export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
   const [screen, setScreen] = useState<Screen>("menu");
@@ -56,6 +57,13 @@ export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
                 </span>
                 <I name="chevr" className="w-4 h-4" />
               </button>
+              <button className="btn-ghost rounded-xl px-5 py-4 flex items-center justify-between border-sky-300/40" onClick={() => setScreen("super")}>
+                <span className="flex items-center gap-2 font-bold text-sky-200">
+                  <I name="spark" className="w-5 h-5 text-sky-300" />
+                  Super Life
+                </span>
+                <I name="chevr" className="w-4 h-4" />
+              </button>
               <button className="btn-ghost rounded-xl px-5 py-3 flex items-center justify-between" onClick={() => setScreen("saves")}>
                 <span className="flex items-center gap-2 font-bold">
                   <I name="book" className="w-5 h-5 text-lav" />
@@ -85,7 +93,23 @@ export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
             g={g}
             onBack={() => setScreen("menu")}
             onBegin={(spec) => {
-              g.startCustom(spec);
+              if ("superLife" in spec) g.startSuperLife(spec);
+              else g.startCustom(spec);
+              onPlay();
+            }}
+          />
+        )}
+
+        {screen === "super" && <SuperLifeEntry onBack={() => setScreen("menu")} onRandom={() => setScreen("super-random")} onCustom={() => setScreen("super-custom")} />}
+        {screen === "super-random" && <RandomSuperFlow onBack={() => setScreen("super")} onBegin={(spec) => { g.startSuperLife(spec); onPlay(); }} />}
+        {screen === "super-custom" && (
+          <CustomFlow
+            g={g}
+            superLife
+            onBack={() => setScreen("super")}
+            onBegin={(spec) => {
+              if ("superLife" in spec) g.startSuperLife(spec);
+              else g.startCustom(spec);
               onPlay();
             }}
           />
@@ -110,6 +134,59 @@ export function Menu({ g, onPlay }: { g: GameApi; onPlay: () => void }) {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function buildRandomSuperSpec(): SuperLifeSpec {
+  return { ...buildRandomSpec(), superLife: randomSuperOptions() };
+}
+
+function SuperLifeEntry({ onBack, onRandom, onCustom }: { onBack: () => void; onRandom: () => void; onCustom: () => void }) {
+  return (
+    <div className="anim-rise max-w-xl mx-auto space-y-4">
+      <div className="panel p-5 border-sky-400/30">
+        <p className="text-[10px] uppercase tracking-[0.25em] font-extrabold text-sky-300">V3.1 · Super Life</p>
+        <h2 className="font-display font-bold text-3xl mt-2">A world with powers</h2>
+        <p className="text-sm text-dim mt-2">Powered people live alongside ordinary families. Choose a pre-rolled life or build one with the existing character creator.</p>
+      </div>
+      <button className="btn-ghost rounded-xl p-4 w-full text-left" onClick={onRandom}>
+        <span className="block font-bold text-sky-200">Random Super Life</span>
+        <span className="block text-xs text-dim mt-1">Roll a power, origin, alignment, family background, and identity.</span>
+      </button>
+      <button className="btn-ghost rounded-xl p-4 w-full text-left" onClick={onCustom}>
+        <span className="block font-bold text-sky-200">Custom Super Life</span>
+        <span className="block text-xs text-dim mt-1">Use the familiar life creator, then configure your super story.</span>
+      </button>
+      <button className="btn-ghost rounded-xl px-5 py-3 w-full font-bold" onClick={onBack}>Back</button>
+    </div>
+  );
+}
+
+function RandomSuperFlow({ onBack, onBegin }: { onBack: () => void; onBegin: (spec: SuperLifeSpec) => void }) {
+  const [spec, setSpec] = useState<SuperLifeSpec>(() => buildRandomSuperSpec());
+  const opts = spec.superLife;
+  const power = opts.startWithPower && opts.powerId ? POWER_BY_ID[opts.powerId] : undefined;
+  return (
+    <div className="anim-rise max-w-xl mx-auto">
+      <p className="text-[10px] uppercase tracking-widest text-sky-300 font-extrabold">Super Life · pre-rolled</p>
+      <h2 className="font-display font-bold text-3xl mb-4">{spec.firstName} {spec.surname}</h2>
+      <div className="panel p-5 space-y-3 border-sky-400/30">
+        <p className="text-sm text-dim">{country(spec.countryId).name} · {spec.gender} · born {spec.birthYear}</p>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="panel-inset p-3"><span className="block text-[10px] uppercase text-dim">Origin</span><b>{opts.originChoice === "random" ? "Random" : opts.originChoice}</b></div>
+          <div className="panel-inset p-3"><span className="block text-[10px] uppercase text-dim">Alignment</span><b className="capitalize">{opts.alignment}</b></div>
+          <div className="panel-inset p-3"><span className="block text-[10px] uppercase text-dim">Family</span><b>{opts.familyBackground.replace(/-/g, " ")}</b></div>
+          <div className="panel-inset p-3"><span className="block text-[10px] uppercase text-dim">Manifestation</span><b>Age {opts.manifestationAge}</b></div>
+        </div>
+        {power ? <div className="panel-inset p-3"><b>{power.name}</b> · {powerTier(power)} tier<p className="text-xs text-dim mt-1">{power.description}</p><p className="text-[10px] text-dim mt-1">{opts.manifestationAge > 0 || opts.originChoice === "acquired" ? "Scheduled, not active at birth; manifestation requires an event choice." : "Innate power active from birth."}</p></div> : <p className="text-sm text-dim">No chosen power at birth; a later discovery is possible.</p>}
+        {opts.alias && <p className="text-sm">Possible identity: <b>{opts.alias}</b></p>}
+      </div>
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <button className="btn-ghost rounded-xl px-4 py-3 font-bold" onClick={onBack}>Back</button>
+        <button className="btn-ghost rounded-xl px-4 py-3 font-bold" onClick={() => setSpec(buildRandomSuperSpec())}>Roll Again</button>
+      </div>
+      <button className="btn-primary rounded-xl px-5 py-4 w-full mt-3 font-bold text-lg" onClick={() => onBegin(spec)}>Begin This Super Life</button>
     </div>
   );
 }
@@ -163,12 +240,17 @@ function RandomFlow({ onBack, onBegin }: { onBack: () => void; onBegin: (spec: C
 
 const STEPS = ["Basics", "Origin", "Family", "Household", "Review"];
 
-function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void; onBegin: (spec: CustomSpec) => void }) {
+function CustomFlow({ g: _g, onBack, onBegin, superLife = false }: { g: GameApi; onBack: () => void; onBegin: (spec: CustomSpec | SuperLifeSpec) => void; superLife?: boolean }) {
   void _g;
+  const steps = superLife ? ["Basics", "Origin", "Family", "Household", "Super Life", "Review"] : STEPS;
+  const reviewStep = steps.length - 1;
   const [step, setStep] = useState(0);
   const [spec, setSpec] = useState<CustomSpec>(() => buildRandomSpec());
   const [designFamily, setDesignFamily] = useState(false);
+  const [superOptions, setSuperOptions] = useState<SuperLifeOptions>(() => randomSuperOptions());
+  const [powerSearch, setPowerSearch] = useState("");
   const set = (patch: Partial<CustomSpec>) => setSpec((s) => ({ ...s, ...patch }));
+  const setSuper = (patch: Partial<SuperLifeOptions>) => setSuperOptions((options) => ({ ...options, ...patch }));
   const c = country(spec.countryId);
   const groups = groupsForCountry(spec.countryId);
   const group = NAME_GROUPS[spec.group ?? c.groups[0]];
@@ -186,7 +268,7 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
         <button className="text-dim text-xs font-bold hover:text-txt" onClick={onBack}>Cancel</button>
       </div>
       <div className="flex gap-1.5 mb-5">
-        {STEPS.map((t, i) => (
+        {steps.map((t, i) => (
           <button
             key={t}
             onClick={() => setStep(i)}
@@ -594,9 +676,64 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
         </div>
       )}
 
-      {step === 4 && (
+      {superLife && step === 4 && (
+        <div className="panel p-5 space-y-5 border-sky-400/30">
+          <SectionTitle icon="spark">Super Life background</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="text-xs font-bold text-dim">Power origin
+              <select value={superOptions.originChoice} onChange={(e) => { const originChoice = e.target.value as SuperLifeOptions["originChoice"]; setSuper({ originChoice, manifestationAge: originChoice !== "born" && superOptions.manifestationAge < 1 ? 1 : superOptions.manifestationAge }); }} className="mt-1 w-full bg-ink border border-line rounded-lg p-2.5 text-txt">
+                <option value="born">Born with powers</option><option value="acquired">Acquired later</option><option value="random">Random origin</option>
+              </select>
+            </label>
+            <label className="text-xs font-bold text-dim">Starting alignment
+              <select value={superOptions.alignment} onChange={(e) => setSuper({ alignment: e.target.value as SuperLifeOptions["alignment"] })} className="mt-1 w-full bg-ink border border-line rounded-lg p-2.5 text-txt">
+                <option value="hero">Hero</option><option value="villain">Villain</option><option value="neutral">Neutral</option><option value="random">Random</option>
+              </select>
+            </label>
+            <label className="text-xs font-bold text-dim">Superpowered family background
+              <select value={superOptions.familyBackground} onChange={(e) => setSuper({ familyBackground: e.target.value as SuperLifeOptions["familyBackground"] })} className="mt-1 w-full bg-ink border border-line rounded-lg p-2.5 text-txt">
+                <option value="super-dynasty">Super Dynasty</option><option value="super-family">Super Family</option><option value="first-generation">First-Generation Super</option><option value="ordinary">Ordinary Family</option><option value="unknown">Unknown Background</option><option value="random">Random</option>
+              </select>
+            </label>
+            <label className="text-xs font-bold text-dim">Power manifestation age: {superOptions.manifestationAge}
+              <input type="range" min={superOptions.originChoice === "born" ? 0 : 1} max="80" value={Math.max(superOptions.originChoice === "born" ? 0 : 1, superOptions.manifestationAge)} onChange={(e) => setSuper({ manifestationAge: Number(e.target.value) })} className="mt-2 w-full accent-sky-400" />
+              <span className="block text-[10px] font-normal mt-1">Acquired powers stay inactive until a meaningful event choice.</span>
+            </label>
+          </div>
+          <div className="panel-inset p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-bold text-sm text-sky-200">Choose a power separately from its origin</p>
+              <button type="button" className="btn-ghost rounded-md px-3 py-2 text-xs font-bold" onClick={() => setSuper({ powerId: randomSuperOptions().powerId, startWithPower: true })}>Randomize power</button>
+            </div>
+            <label className="flex min-h-11 items-center gap-2 text-xs font-bold text-dim">
+              <input type="checkbox" checked={superOptions.startWithPower} onChange={(e) => setSuper({ startWithPower: e.target.checked })} className="accent-sky-400" />
+              Plan a specific power (turn off to discover one later)
+            </label>
+            {superOptions.startWithPower && <>
+              <input type="search" value={powerSearch} onChange={(e) => setPowerSearch(e.target.value)} placeholder="Search powers by name, category, or description" aria-label="Search superpowers" className="w-full bg-ink border border-line rounded-lg px-3 py-2 text-sm" />
+              <select value={superOptions.powerId ?? ""} onChange={(e) => setSuper({ powerId: e.target.value || undefined })} aria-label="Choose a superpower" className="w-full bg-ink border border-line rounded-lg p-2.5 text-txt">
+                <option value="">Choose a power</option>
+                {SUPER_POWERS.filter((entry) => `${entry.name} ${entry.category} ${entry.description}`.toLowerCase().includes(powerSearch.toLowerCase())).map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.category} · {powerTier(entry)} tier</option>)}
+              </select>
+              {superOptions.powerId && POWER_BY_ID[superOptions.powerId] && <div className="text-xs text-dim"><b className="text-txt">{POWER_BY_ID[superOptions.powerId].name}</b> · {powerTier(POWER_BY_ID[superOptions.powerId])} potential<br />{POWER_BY_ID[superOptions.powerId].description}<br />Limits: {POWER_BY_ID[superOptions.powerId].limitations.join("; ")}<br />Progression: {POWER_BY_ID[superOptions.powerId].progression}</div>}
+            </>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="text-xs font-bold text-dim">Super identity (optional)
+              <input type="text" maxLength={32} value={superOptions.alias ?? ""} onChange={(e) => setSuper({ alias: e.target.value })} placeholder="Leave blank to choose later" className="mt-1 w-full bg-ink border border-line rounded-lg px-3 py-2.5 text-sm text-txt" />
+            </label>
+            <label className="flex min-h-11 items-center gap-2 text-xs font-bold text-dim cursor-pointer">
+              <input type="checkbox" checked={superOptions.identityPublic} onChange={(e) => setSuper({ identityPublic: e.target.checked })} className="accent-sky-400" />
+              Publicly connect this identity at the start (irreversible exposure)
+            </label>
+          </div>
+          <p className="text-[11px] text-dim">Family background affects which relatives have powers and the family’s starting reputation. It does not decide your morality.</p>
+        </div>
+      )}
+
+      {step === reviewStep && (
         <div className="panel p-5">
-          <SectionTitle icon="feather">The Whole Story So Far</SectionTitle>
+          <SectionTitle icon="feather">{superLife ? "Super Life Review" : "The Whole Story So Far"}</SectionTitle>
           <p className="font-display font-bold text-3xl text-peach">{spec.firstName || "…"} {spec.surname}</p>
           <p className="text-dim text-sm mb-3">
             {spec.gender === "female" ? "Girl" : "Boy"} · {group?.name} · {c.name} · {spec.city || "a surprise city"} · born {spec.birthYear}
@@ -617,6 +754,11 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
               <p className="text-dim italic">Family: the dice decide. You'll meet them at birth.</p>
             )}
           </div>
+          {superLife && <div className="panel-inset p-3 mt-4 text-sm border-sky-400/30">
+            <p className="font-bold text-sky-200">{superOptions.startWithPower && superOptions.powerId ? POWER_BY_ID[superOptions.powerId]?.name ?? "Power TBD" : "No chosen power yet"}</p>
+            <p className="text-xs text-dim mt-1">{superOptions.originChoice} origin · {superOptions.alignment} inclination · {superOptions.familyBackground.replace(/-/g, " ")} · manifestation around age {superOptions.manifestationAge}</p>
+            {superOptions.alias && <p className="text-xs mt-1">Super identity: {superOptions.alias}</p>}
+          </div>}
         </div>
       )}
 
@@ -624,7 +766,7 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
         <button className="btn-ghost rounded-xl px-5 py-3 font-bold" disabled={step === 0} onClick={() => setStep((x) => x - 1)}>
           Back
         </button>
-        {step < 4 ? (
+        {step < reviewStep ? (
           <button className="btn-primary rounded-xl px-6 py-3 font-bold flex-1" onClick={() => setStep((x) => x + 1)}>Next</button>
         ) : (
           <button
@@ -642,10 +784,10 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
                   parentStatus: r.parentStatus,
                 };
               }
-              onBegin(finalSpec);
+              onBegin(superLife ? { ...finalSpec, superLife: { ...superOptions } } : finalSpec);
             }}
           >
-            Begin This Life
+            {superLife ? "Begin This Super Life" : "Begin This Life"}
           </button>
         )}
       </div>
