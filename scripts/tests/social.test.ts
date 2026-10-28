@@ -1,10 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FamilyScreen } from "../../src/components/Screens";
+import { FamilyTree } from "../../src/components/FamilyTree";
 import { NpcProfile } from "../../src/components/NpcProfile";
 import type { GameApi } from "../../src/game/state";
 import { fullName, makeNpcPerson } from "../../src/game/characters";
-import { interactWithNpc, npcInteractionLock, npcInteractionOptions, npcRelationshipScore } from "../../src/game/social";
+import { areFamilyRelated, interactWithNpc, npcInteractionLock, npcInteractionOptions, npcRelationshipScore } from "../../src/game/social";
 import { validateState } from "../../src/game/persistence/saves";
 import { setSeed } from "../../src/game/rng";
 import { assert, assertEqual, freshLife } from "./util";
@@ -139,6 +140,52 @@ export const tests = [
       interactWithNpc(s, friend.id, "argue");
       assertEqual(npcRelationshipScore(s, friend.id), beforeArgument - 12, "argument did not damage relationship");
       assertEqual(friend.happiness, moodBefore - 3, "argument did not affect NPC mood");
+    },
+  },
+  {
+    name: "family members stay in family sections instead of duplicating under friends, and the tree follows generations",
+    fn: () => {
+      const s = freshLife(9307);
+      const p = s.chars[s.currentId];
+      const mother = s.chars[p.motherId ?? ""];
+      assert(mother, "fixture needs a mother");
+      mother.firstName = "TreeMother";
+
+      let sibling = Object.values(s.chars).find((c) => c.id !== p.id && ((p.motherId && c.motherId === p.motherId) || (p.fatherId && c.fatherId === p.fatherId)));
+      if (!sibling) {
+        sibling = makeNpcPerson(s, p.age, p.countryId, p.group);
+        sibling.motherId = p.motherId;
+        sibling.fatherId = p.fatherId;
+        if (!mother.childrenIds.includes(sibling.id)) mother.childrenIds.push(sibling.id);
+      }
+      sibling.firstName = "TreeSibling";
+
+      let grandmother = mother.motherId ? s.chars[mother.motherId] : undefined;
+      if (!grandmother) {
+        grandmother = makeNpcPerson(s, mother.age + 25, p.countryId, p.group);
+        grandmother.gender = "female";
+        grandmother.childrenIds.push(mother.id);
+        mother.motherId = grandmother.id;
+      }
+      grandmother.firstName = "TreeGrandmother";
+      p.friends.push(
+        { id: mother.id, value: 70 },
+        { id: sibling.id, value: 65 },
+        { id: grandmother.id, value: 80 },
+      );
+
+      assert(areFamilyRelated(s, p, mother), "parent was not recognized as family");
+      assert(areFamilyRelated(s, p, sibling), "sibling was not recognized as family");
+      assert(areFamilyRelated(s, p, grandmother), "grandparent was not recognized as family");
+
+      const familyMarkup = renderToStaticMarkup(createElement(FamilyScreen, { s, onSelectNpc: () => {} }));
+      const friendsMarkup = familyMarkup.slice(familyMarkup.indexOf("Friends &amp; Rivals"));
+      assert(!friendsMarkup.includes("TreeMother") && !friendsMarkup.includes("TreeSibling") && !friendsMarkup.includes("TreeGrandmother"), "relative was duplicated in Friends & Rivals");
+      assert(familyMarkup.includes("TreeMother") && familyMarkup.includes("TreeSibling") && familyMarkup.includes("TreeGrandmother"), "relatives disappeared from family sections");
+
+      const treeMarkup = renderToStaticMarkup(createElement(FamilyTree, { s, onSelectNpc: () => {} }));
+      assert(treeMarkup.includes('role="tree"') && treeMarkup.includes("Grandparents") && treeMarkup.includes("Parents") && treeMarkup.includes("You, siblings &amp; partner"), "family tree generations did not render");
+      assert(treeMarkup.includes("TreeGrandmother") && treeMarkup.includes("TreeMother") && treeMarkup.includes("TreeSibling"), "family tree omitted recorded relatives");
     },
   },
   {

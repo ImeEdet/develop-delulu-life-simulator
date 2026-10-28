@@ -170,3 +170,40 @@ for (const t of targets) {
   writeFileSync(join(OUT, t.name), draw(t.size, t.opts));
   console.log("wrote", t.name);
 }
+
+// Keep the scalable manifest/favicon icon visually identical to the PNG set.
+// Previously this hand-drawn SVG used a different D mark, so platforms that
+// selected SVG versus PNG appeared to install completely different app icons.
+const svgScale = Math.round(512 / 11);
+const svgOffset = Math.round((512 - 7 * svgScale) / 2);
+const svgRects = D_GLYPH.flatMap((row, y) => row.flatMap((on, x) => on
+  ? [`<rect x="${svgOffset + x * svgScale}" y="${svgOffset + y * svgScale}" width="${svgScale}" height="${svgScale}"/>`]
+  : [])).join("\n    ");
+const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2e1c58"/>
+      <stop offset="1" stop-color="#15102a"/>
+    </linearGradient>
+    <radialGradient id="pink" cx="82%" cy="12%" r="46%">
+      <stop offset="0" stop-color="#ff5fa2" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#ff5fa2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mint" cx="12%" cy="88%" r="42%">
+      <stop offset="0" stop-color="#5ce8a9" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#5ce8a9" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="rounded"><rect width="512" height="512" rx="92"/></clipPath>
+  </defs>
+  <g clip-path="url(#rounded)">
+    <rect width="512" height="512" fill="url(#dusk)"/>
+    <rect width="512" height="512" fill="url(#pink)"/>
+    <rect width="512" height="512" fill="url(#mint)"/>
+    <g fill="#f4efff">
+    ${svgRects}
+    </g>
+    <path d="M102 82 122 102 102 122 82 102Z" fill="#ffb054"/>
+  </g>
+</svg>\n`;
+writeFileSync(join(OUT, "icon.svg"), svgIcon);
+console.log("wrote", "icon.svg");

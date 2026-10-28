@@ -4,19 +4,40 @@
       <stop offset="0" stop-color="#2e1c58"/>
       <stop offset="1" stop-color="#15102a"/>
     </linearGradient>
-    <radialGradient id="pink" cx="0.82" cy="0.12" r="0.7">
-      <stop offset="0" stop-color="#ff5fa2" stop-opacity="0.55"/>
+    <radialGradient id="pink" cx="82%" cy="12%" r="46%">
+      <stop offset="0" stop-color="#ff5fa2" stop-opacity=".35"/>
       <stop offset="1" stop-color="#ff5fa2" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="mint" cx="0.12" cy="0.88" r="0.7">
-      <stop offset="0" stop-color="#5ce8a9" stop-opacity="0.4"/>
+    <radialGradient id="mint" cx="12%" cy="88%" r="42%">
+      <stop offset="0" stop-color="#5ce8a9" stop-opacity=".22"/>
       <stop offset="1" stop-color="#5ce8a9" stop-opacity="0"/>
     </radialGradient>
+    <clipPath id="rounded"><rect width="512" height="512" rx="92"/></clipPath>
   </defs>
-  <rect width="512" height="512" rx="92" fill="url(#dusk)"/>
-  <rect width="512" height="512" rx="92" fill="url(#pink)"/>
-  <rect width="512" height="512" rx="92" fill="url(#mint)"/>
-  <path d="M102 92h24l104 14v300l-104 14H90V92h12z" fill="#f4efff"/>
-  <path d="M128 146h40c70 0 118 42 118 110s-48 110-118 110h-40V146zm36 62v96h10c36 0 58-20 58-48s-22-48-58-48h-10z" fill="#f4efff"/>
-  <path d="M102 110l14-26 14 26-14 8z" fill="#ffd166"/>
+  <g clip-path="url(#rounded)">
+    <rect width="512" height="512" fill="url(#dusk)"/>
+    <rect width="512" height="512" fill="url(#pink)"/>
+    <rect width="512" height="512" fill="url(#mint)"/>
+    <g fill="#f4efff">
+    <rect x="92" y="92" width="47" height="47"/>
+    <rect x="139" y="92" width="47" height="47"/>
+    <rect x="186" y="92" width="47" height="47"/>
+    <rect x="233" y="92" width="47" height="47"/>
+    <rect x="92" y="139" width="47" height="47"/>
+    <rect x="280" y="139" width="47" height="47"/>
+    <rect x="92" y="186" width="47" height="47"/>
+    <rect x="327" y="186" width="47" height="47"/>
+    <rect x="92" y="233" width="47" height="47"/>
+    <rect x="327" y="233" width="47" height="47"/>
+    <rect x="92" y="280" width="47" height="47"/>
+    <rect x="327" y="280" width="47" height="47"/>
+    <rect x="92" y="327" width="47" height="47"/>
+    <rect x="280" y="327" width="47" height="47"/>
+    <rect x="92" y="374" width="47" height="47"/>
+    <rect x="139" y="374" width="47" height="47"/>
+    <rect x="186" y="374" width="47" height="47"/>
+    <rect x="233" y="374" width="47" height="47"/>
+    </g>
+    <path d="M102 82 122 102 102 122 82 102Z" fill="#ffb054"/>
+  </g>
 </svg>
