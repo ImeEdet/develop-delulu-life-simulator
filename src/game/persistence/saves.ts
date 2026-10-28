@@ -13,6 +13,10 @@ const SLOT_PREFIX = "slot:";
 export const AUTOSAVE_ID = "autosave";
 const LEGACY_KEY = "delulu-life-save-v1";
 
+function isRecord(value: unknown): value is Record<string, number> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function slotKey(id: string): string {
   return SLOT_PREFIX + id;
 }
@@ -53,6 +57,7 @@ export function migrate(raw: unknown): { state: GameState; errors: string[] } {
   // ---- V1 -> V2 structural migration
   state.version = CURRENT_SCHEMA;
   state.nameUsage = state.nameUsage ?? emptyNameUsage();
+  if (state.themePreference !== "auto" && state.themePreference !== "classic" && state.themePreference !== "gold") state.themePreference = "auto";
   if (!Array.isArray(state.log)) state.log = [];
   if (!Array.isArray(state.pending)) state.pending = [];
   for (const c of Object.values(state.chars)) {
@@ -66,12 +71,55 @@ export function migrate(raw: unknown): { state: GameState; errors: string[] } {
     if (!Array.isArray(c.milestones)) c.milestones = [];
     if (!Array.isArray(c.usedActions)) c.usedActions = [];
     c.eventCooldowns = c.eventCooldowns ?? {};
-    c.languages = c.languages ?? {};
-    c.skills = c.skills ?? {};
+    if (!isRecord(c.languages)) c.languages = {};
+    if (!isRecord(c.languageExposure)) c.languageExposure = Object.fromEntries(Object.entries(c.languages).map(([id, value]) => [id, Math.round(value * 0.5)]));
+    if (!isRecord(c.skills)) c.skills = {};
+    if (!isRecord(c.skillLastPractice)) c.skillLastPractice = {};
+    if (!isRecord(c.aptitudes)) c.aptitudes = {};
+    for (const [id, value] of Object.entries(c.languages)) c.languages[id] = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+    for (const [id, value] of Object.entries(c.languageExposure)) c.languageExposure[id] = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+    for (const [id, value] of Object.entries(c.skills)) c.skills[id] = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+    for (const [id, value] of Object.entries(c.skillLastPractice)) if (typeof value !== "number" || !Number.isFinite(value)) delete c.skillLastPractice[id];
+    for (const [id, value] of Object.entries(c.aptitudes)) c.aptitudes[id] = typeof value === "number" && Number.isFinite(value) ? Math.max(0.6, Math.min(1.5, value)) : 1;
+    c.culturalHeritage = Array.isArray(c.culturalHeritage) ? c.culturalHeritage.filter((id): id is string => typeof id === "string") : c.group ? [c.group] : [];
+    c.ethnicities = Array.isArray(c.ethnicities) ? c.ethnicities.filter((label): label is string => typeof label === "string" && !!label.trim()) : [];
+    c.birthCountryId = typeof c.birthCountryId === "string" && COUNTRIES[c.birthCountryId] ? c.birthCountryId : c.countryId;
+    c.birthCity = typeof c.birthCity === "string" && c.birthCity ? c.birthCity : c.city;
+    c.citizenships = Array.isArray(c.citizenships) ? c.citizenships.filter((id): id is string => typeof id === "string" && !!COUNTRIES[id]) : [];
+    if (c.citizenships.length === 0) c.citizenships = [c.citizenOf ?? c.countryId];
+    c.fame = typeof c.fame === "number" && Number.isFinite(c.fame) ? Math.max(0, Math.min(100, c.fame)) : 0;
+    c.reputation = typeof c.reputation === "number" && Number.isFinite(c.reputation) ? Math.max(0, Math.min(100, c.reputation)) : 50;
+    if (c.sportsCareer && typeof c.sportsCareer === "object" && typeof c.sportsCareer.sportId === "string") {
+      const sport = c.sportsCareer;
+      if (!["school", "amateur", "professional", "retired"].includes(sport.level)) sport.level = "amateur";
+      for (const key of ["years", "experience", "salary", "wins", "losses", "competitions"] as const) sport[key] = typeof sport[key] === "number" && Number.isFinite(sport[key]) ? Math.max(0, sport[key]) : 0;
+      sport.awards = Array.isArray(sport.awards) ? sport.awards.filter((label): label is string => typeof label === "string") : [];
+      sport.achievements = Array.isArray(sport.achievements) ? sport.achievements.filter((label): label is string => typeof label === "string") : [];
+      if (typeof sport.lastCompetitionYear !== "number" || !Number.isFinite(sport.lastCompetitionYear)) sport.lastCompetitionYear = undefined;
+      if (typeof sport.injuryUntil !== "number" || !Number.isFinite(sport.injuryUntil)) sport.injuryUntil = undefined;
+      if (typeof sport.injury !== "string") sport.injury = undefined;
+      sport.sponsorshipIncome = typeof sport.sponsorshipIncome === "number" && Number.isFinite(sport.sponsorshipIncome) ? Math.max(0, sport.sponsorshipIncome) : 0;
+    } else c.sportsCareer = undefined;
+    if (c.fameCareer && typeof c.fameCareer === "object") {
+      const fame = c.fameCareer;
+      if (!["acting", "modelling", "music"].includes(fame.pathway)) c.fameCareer = undefined;
+      else {
+        fame.level = typeof fame.level === "number" && Number.isFinite(fame.level) ? Math.max(1, Math.min(5, fame.level)) : 1;
+        fame.experience = typeof fame.experience === "number" && Number.isFinite(fame.experience) ? Math.max(0, fame.experience) : 0;
+        fame.projects = typeof fame.projects === "number" && Number.isFinite(fame.projects) ? Math.max(0, fame.projects) : 0;
+        fame.annualIncome = typeof fame.annualIncome === "number" && Number.isFinite(fame.annualIncome) ? Math.max(0, fame.annualIncome) : 0;
+        fame.portfolio = typeof fame.portfolio === "number" && Number.isFinite(fame.portfolio) ? Math.max(0, fame.portfolio) : 0;
+        fame.releases = typeof fame.releases === "number" && Number.isFinite(fame.releases) ? Math.max(0, fame.releases) : 0;
+        if (typeof fame.lastProjectYear !== "number" || !Number.isFinite(fame.lastProjectYear)) fame.lastProjectYear = undefined;
+        if (typeof fame.agency !== "string") fame.agency = undefined;
+        fame.awards = Array.isArray(fame.awards) ? fame.awards.filter((label): label is string => typeof label === "string") : [];
+      }
+    } else c.fameCareer = undefined;
     if (!c.group) {
       const cty = COUNTRIES[c.countryId];
       c.group = cty ? cty.groups[0] : legacyGroupId("anglo");
     }
+    if (c.culturalHeritage.length === 0 && c.group) c.culturalHeritage = [c.group];
     c.citizenOf = c.citizenOf ?? c.countryId;
     for (const k of ["health", "happiness", "smarts", "looks"] as const) {
       if (typeof c[k] !== "number" || Number.isNaN(c[k])) c[k] = 60;

@@ -275,6 +275,7 @@ export function hiringChance(p: Char, job: JobDef): number {
   else if (p.education === "university") c += 0.04;
   c += traitMod(p, "career") * 0.03;
   c += traitMod(p, "charm") * 0.02;
+  c += ((p.skills.communication ?? 0) + (p.skills.negotiation ?? 0) + (p.skills.leadership ?? 0)) / 3000;
   if (isImmigrant(p)) c -= 0.16;
   return Math.min(0.92, Math.max(0.08, c));
 }

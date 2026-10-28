@@ -12,6 +12,9 @@ import {
   payTuition, repayLoans, syncDebts, takeLoan, eraFactor, netWorth,
 } from "./economy";
 import { EVENTS, makeCtx, runEvent } from "./events";
+import { advanceCharacterSkills } from "./skills";
+import { advanceSportCareer } from "./sports";
+import { advanceFame } from "./fame";
 
 function L(s: GameState, age: number, kind: LogKind, text: string) {
   s.log.push({ id: s.seq++, year: s.worldYear, age, text, kind });
@@ -111,7 +114,7 @@ function npcEducation(s: GameState, c: Char, notes: { prio: number; text: string
   } else if (c.age === cty.secondaryStart) {
     c.education = "secondary";
   } else if (c.age === cty.examAge) {
-    c.examScore = Math.round(clamp(c.smarts * 0.85 + ri(0, 20), 15, 99));
+    c.examScore = Math.round(clamp(c.smarts * 0.75 + (c.skills.mathematics ?? 0) * 0.06 + (c.skills.writing ?? 0) * 0.04 + ri(0, 20), 15, 99));
   } else if (c.age === cty.examAge + 1 && !c.uni && !c.job) {
     if ((c.examScore ?? 0) >= 55 && c.smarts > 55 && chance(0.45)) {
       c.uni = { year: 1, major: pick(["business", "cs", "law", "biology", "education", "engineering"]), gpa: ri(50, 85) };
@@ -162,13 +165,19 @@ function npcCareer(s: GameState, c: Char) {
   }
 }
 
+function extraCareerIncome(c: Char): number {
+  const sports = c.sportsCareer?.level === "professional" ? c.sportsCareer.salary + (c.sportsCareer.sponsorshipIncome ?? 0) : 0;
+  return sports + (c.fameCareer?.annualIncome ?? 0);
+}
+
 function npcFinances(s: GameState, c: Char) {
   if (c.age < 18 && !c.job) {
+    c.money += extraCareerIncome(c);
     chargeHousehold(s, c);
     return;
   }
   accrueLoans(c);
-  const income = c.retired ? c.pension : c.job ? c.job.salary : 0;
+  const income = (c.retired ? c.pension : c.job ? c.job.salary : 0) + extraCareerIncome(c);
   const cost = livingCost(c, s.worldYear);
   let cash = c.money + income - cost;
   if (cash < 0 && c.loans.length === 0 && chance(0.5)) {
@@ -244,6 +253,12 @@ function npcRomance(s: GameState, c: Char, notes: { prio: number; text: string; 
 }
 
 function npcMigration(s: GameState, c: Char, p: Char) {
+  if (c.flags.includes("immigrant") && c.arrivedYear && !c.flags.includes("citizen") && s.worldYear - c.arrivedYear >= 8) {
+    c.flags.push("citizen");
+    c.citizenOf = c.countryId;
+    c.citizenships ??= [];
+    if (!c.citizenships.includes(c.countryId)) c.citizenships.push(c.countryId);
+  }
   if (chance(0.012)) {
     c.city = pick(country(c.countryId).cities);
   }
@@ -318,6 +333,9 @@ function simulateNpcs(s: GameState, p: Char, Lf: (k: LogKind, t: string) => void
     c.happiness = clamp(c.happiness + (c.happiness < 55 ? 0.8 : -0.4));
     npcEducation(s, c, notes);
     npcCareer(s, c);
+    advanceCharacterSkills(c, s.worldYear, true);
+    advanceSportCareer(s, c, true);
+    advanceFame(s, c, true);
     npcRomance(s, c, notes);
     npcFinances(s, c);
     npcMigration(s, c, p);
@@ -372,7 +390,7 @@ function milestones(s: GameState, p: Char, Lf: (k: LogKind, t: string) => void) 
   }
   if (p.age === cty.examAge && !has("fexam")) {
     add("fexam");
-    const score = Math.round(clamp(p.smarts * 0.85 + ri(0, 20) + traitMod(p, "career") * 4, 15, 99));
+    const score = Math.round(clamp(p.smarts * 0.75 + (p.skills.mathematics ?? 0) * 0.06 + (p.skills.writing ?? 0) * 0.04 + ri(0, 20) + traitMod(p, "career") * 4, 15, 99));
     p.examScore = score;
     p.education = "secondary";
     if (score >= 80) {
@@ -519,7 +537,7 @@ function settle(s: GameState, p: Char, Lf: (k: LogKind, t: string) => void) {
   // ---- dependent children: allowance only, the household covers the rest
   if (p.age < 18 && !p.job && !p.uni) {
     const allowance = allowanceFor(p, year);
-    p.money += allowance;
+    p.money += allowance + extraCareerIncome(p);
     chargeHousehold(s, p);
     if (p.age === country(p.countryId).schoolStart - 1) {
       Lf("money", "The allowance era begins. Small money, enormous power.");
@@ -531,7 +549,7 @@ function settle(s: GameState, p: Char, Lf: (k: LogKind, t: string) => void) {
     const def = JOBS[p.job.jobId];
     if (def) p.job.salary = nominalSalary(p, def, p.job.seniority, year);
   }
-  const income = p.retired ? p.pension : p.job ? p.job.salary : 0;
+  const income = (p.retired ? p.pension : p.job ? p.job.salary : 0) + extraCareerIncome(p);
   const cost = livingCost(p, year);
   let cash = p.money + income - cost;
 
@@ -619,7 +637,9 @@ function drift(s: GameState, p: Char) {
   else if (p.happiness > target) p.happiness = clamp(p.happiness - 0.5);
   // languages: household exposure starts early, formal fluency comes later
   const native = country(p.countryId).languages[0];
+  p.languageExposure ??= {};
   if (p.age < 18) {
+    p.languageExposure[native] = clamp((p.languageExposure[native] ?? 0) + 5, 0, 100);
     p.languages[native] = clamp((p.languages[native] ?? 0) + 6, 0, 95);
     for (const l of country(p.countryId).languages.slice(1)) {
       p.languages[l] = clamp((p.languages[l] ?? 0) + 4, 0, 95);
@@ -628,7 +648,10 @@ function drift(s: GameState, p: Char) {
     for (const parId of [p.motherId, p.fatherId]) {
       const par = parId ? s.chars[parId] : undefined;
       if (par) for (const [l, v] of Object.entries(par.languages)) {
-        if (v >= 60) p.languages[l] = clamp((p.languages[l] ?? 0) + 2, 0, 90);
+        if (v >= 25) {
+          p.languageExposure[l] = clamp((p.languageExposure[l] ?? 0) + 5, 0, 100);
+          if (v >= 60) p.languages[l] = clamp((p.languages[l] ?? 0) + 2, 0, 90);
+        }
       }
     }
   } else if (p.flags.includes("immigrant")) {
@@ -642,6 +665,8 @@ function drift(s: GameState, p: Char) {
   if (p.flags.includes("immigrant") && p.arrivedYear && !p.flags.includes("citizen") && s.worldYear - p.arrivedYear >= 8) {
     p.flags.push("citizen");
     p.citizenOf = p.countryId;
+    p.citizenships ??= [];
+    if (!p.citizenships.includes(p.countryId)) p.citizenships.push(p.countryId);
   }
 }
 
@@ -718,6 +743,9 @@ export function ageUp(s: GameState): void {
   const Lf = (k: LogKind, t: string) => L(s, p.age, k, t);
   simulateNpcs(s, p, Lf);
   if (!p.alive) return;
+  advanceCharacterSkills(p, s.worldYear, false);
+  advanceSportCareer(s, p, false);
+  advanceFame(s, p, false);
   milestones(s, p, Lf);
   fireRandom(s, p);
   settle(s, p, Lf);

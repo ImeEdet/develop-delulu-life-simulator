@@ -5,6 +5,8 @@ import { ACTIONS, TRAIT_LIST } from "../game/content";
 import { actionLock } from "../game/actions";
 import { netWorth, nominal } from "../game/economy";
 import type { GameApi } from "../game/state";
+import { NAME_GROUPS } from "../game/name-data";
+import { isGoldTheme } from "../game/fame";
 import { Chip, CountryTag, I, LangBar, Modal, Portrait, SectionTitle } from "./ui";
 
 export function ActionsScreen({ s, g }: { s: GameState; g: GameApi }) {
@@ -165,7 +167,7 @@ const FLAG_LABELS: Record<string, { label: string; color: string }> = {
   "half-retire": { label: "Half-Time", color: "dim" },
 };
 
-export function ProfileScreen({ s }: { s: GameState }) {
+export function ProfileScreen({ s, g }: { s: GameState; g: GameApi }) {
   const p = s.chars[s.currentId];
   const net = netWorth(p);
   const flags = p.flags.filter((f) => FLAG_LABELS[f]);
@@ -184,6 +186,17 @@ export function ProfileScreen({ s }: { s: GameState }) {
             <Chip color="dim">Generation {s.generation}</Chip>
             <Chip color="dim">{p.gender === "female" ? "she/her" : "he/him"}</Chip>
           </div>
+        </div>
+      </section>
+
+      <section className="panel p-4">
+        <SectionTitle icon="globe">Roots & residence</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div><p className="text-[10px] uppercase tracking-wider text-dim font-extrabold">Born in</p><p className="font-bold mt-1">{p.birthCity ?? p.city}, {country(p.birthCountryId ?? p.countryId).name}</p></div>
+          <div><p className="text-[10px] uppercase tracking-wider text-dim font-extrabold">Lives in</p><p className="font-bold mt-1">{p.city}, {country(p.countryId).name}</p></div>
+          <div className="sm:col-span-2"><p className="text-[10px] uppercase tracking-wider text-dim font-extrabold">Cultural connections</p><div className="flex flex-wrap gap-1.5 mt-1">{(p.culturalHeritage ?? []).map((id) => <Chip key={id} color="lav">{NAME_GROUPS[id]?.name ?? id}</Chip>)}{(!p.culturalHeritage || p.culturalHeritage.length === 0) && <span className="text-dim">Not recorded</span>}</div><p className="text-[10px] text-dim mt-1">Culture is family background, not a measure of language fluency or personal traits.</p></div>
+          <div className="sm:col-span-2"><p className="text-[10px] uppercase tracking-wider text-dim font-extrabold">Ethnicity (self-described)</p><div className="flex flex-wrap gap-1.5 mt-1">{(p.ethnicities ?? []).map((label) => <Chip key={label} color="peach"><span className="break-all">{label}</span></Chip>)}{(!p.ethnicities || p.ethnicities.length === 0) && <span className="text-dim">Not specified</span>}</div></div>
+          <div className="sm:col-span-2"><p className="text-[10px] uppercase tracking-wider text-dim font-extrabold">Citizenship</p><div className="flex flex-wrap gap-1.5 mt-1">{(p.citizenships ?? [p.citizenOf ?? p.countryId]).map((id) => <Chip key={id} color="mint">{country(id).name}</Chip>)}</div></div>
         </div>
       </section>
 
@@ -240,6 +253,13 @@ export function ProfileScreen({ s }: { s: GameState }) {
         </div>
       </section>
 
+      {Object.keys(p.languageExposure ?? {}).length > 0 && (
+        <section>
+          <SectionTitle icon="globe">Language exposure</SectionTitle>
+          <div className="panel-inset p-3 space-y-2">{Object.entries(p.languageExposure ?? {}).sort((a, b) => b[1] - a[1]).map(([id, value]) => <LangBar key={id} name={LANGS[id]?.name ?? id} value={value} />)}<p className="text-[10px] text-dim">Community and family exposure is not the same as fluency.</p></div>
+        </section>
+      )}
+
       {skills.length > 0 && (
         <section>
           <SectionTitle icon="star">Skills</SectionTitle>
@@ -250,6 +270,20 @@ export function ProfileScreen({ s }: { s: GameState }) {
           </div>
         </section>
       )}
+
+      <section className="panel p-4">
+        <SectionTitle icon="spark">Settings · appearance</SectionTitle>
+        <p className="text-xs text-dim mb-3">Auto follows the fame threshold. You can keep the classic colors or use the warm gold palette regardless of fame.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {(["auto", "classic", "gold"] as const).map((preference) => {
+            const selected = (s.themePreference ?? "auto") === preference;
+            return <button key={preference} aria-pressed={selected} onClick={() => g.setThemePreference(preference)} className={`rounded-lg border px-3 py-2.5 text-sm font-bold ${selected ? "border-peach bg-peach/15 text-peach" : "border-line bg-ink3 text-dim"}`}>
+              {preference === "auto" ? "Auto · fame at 35" : preference === "classic" ? "Classic" : "Gold / champagne"}
+            </button>;
+          })}
+        </div>
+        <p className="text-[11px] text-dim mt-2">Currently showing {isGoldTheme(p, s.themePreference ?? "auto") ? "gold / champagne" : "classic"} colors.</p>
+      </section>
 
       <section>
         <SectionTitle icon="flag">Milestones</SectionTitle>

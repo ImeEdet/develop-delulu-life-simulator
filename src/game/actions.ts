@@ -4,6 +4,7 @@ import { ACTIONS, CARS, EMPLOYERS, JOBS, MAJOR_LIST, eligibleJobs, hiringChance,
 import { clamp, pick, chance, random } from "./rng";
 import { createChild, makeNpcPerson } from "./characters";
 import { nominal, nominalSalary, takeLoan, eraFactor } from "./economy";
+import { developSkill } from "./skills";
 
 function L(s: GameState, p: Char, kind: LogKind, text: string) {
   s.log.push({ id: s.seq++, year: s.worldYear, age: p.age, text, kind });
@@ -66,12 +67,16 @@ export function doAction(s: GameState, id: string, opt?: string): void {
 
   switch (id) {
     case "exercise":
+      developSkill(p, "fitness", 0.8, s.worldYear);
       p.health = clamp(p.health + 4);
       p.happiness = clamp(p.happiness + 2);
       L(s, p, "neutral", "You worked out. Your muscles filed a complaint, but a happy one.");
       toast(s, "You'll feel it tomorrow. Or today.");
       break;
     case "study":
+      developSkill(p, "mathematics", 0.75, s.worldYear);
+      developSkill(p, "writing", 0.45, s.worldYear);
+      if (p.uni || p.education === "university") developSkill(p, "research", 0.45, s.worldYear);
       if (p.age < 18) {
         p.smarts = clamp(p.smarts + 2);
         L(s, p, "neutral", p.uni ? "You studied until the numbers had faces. The faces were helpful." : "You studied. Your brain quietly updated itself to a newer version.");
@@ -87,6 +92,7 @@ export function doAction(s: GameState, id: string, opt?: string): void {
       L(s, p, "neutral", "You meditated. The breathing went in; the noise went out.");
       break;
     case "socialize": {
+      developSkill(p, "communication", 0.65, s.worldYear);
       p.happiness = clamp(p.happiness + 4);
       for (const f of p.friends) f.value = clamp(f.value + 6, -100, 100);
       const f = p.friends.length ? s.chars[p.friends[0].id] : undefined;
@@ -304,7 +310,9 @@ export function doAction(s: GameState, id: string, opt?: string): void {
     case "promote": {
       const j = p.job;
       if (!j) break;
-      const c = 0.35 + p.smarts / 400 + (p.traits.includes("ambitious") ? 0.05 : 0);
+      const leadership = p.skills.leadership ?? 0;
+      const communication = p.skills.communication ?? 0;
+      const c = 0.35 + p.smarts / 400 + leadership / 500 + communication / 1000 + (p.traits.includes("ambitious") ? 0.05 : 0);
       if (j.seniority < 3 && random() < c) {
         j.seniority++;
         const def = JOBS[j.jobId];

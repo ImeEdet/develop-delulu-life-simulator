@@ -17,14 +17,19 @@ self.addEventListener("install", (event) => {
     caches.open(CACHE_VERSION).then(async (cache) => {
       for (const url of APP_SHELL) {
         try {
-          await cache.add(url);
+          await cache.add(new Request(url, { cache: "reload" }));
         } catch (err) {
           // A missing optional asset must not block installation.
           console.warn("SW precache miss:", url, err);
         }
       }
-    }).then(() => self.skipWaiting())
+    })
   );
+});
+
+// Hold updates in the waiting state until the user taps the in-app update button.
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

@@ -52,6 +52,10 @@ function CharCard({ c, label, showMoney = false, onSelect }: { c: Char; label: s
           )}
         </div>
       </div>
+      <span className="shrink-0 self-center inline-flex flex-col items-center gap-0.5 text-[9px] font-extrabold text-peach" aria-hidden="true">
+        <I name="chevr" className="w-4 h-4" />
+        <span>Profile</span>
+      </span>
     </button>
   );
 }
@@ -77,6 +81,10 @@ export function FamilyScreen({ s, onSelectNpc = () => {} }: { s: GameState; onSe
 
   return (
     <div className="space-y-6 pb-6">
+      <div className="panel-inset p-3 flex items-start gap-2 text-xs text-dim" role="note">
+        <I name="users" className="w-4 h-4 text-peach shrink-0 mt-0.5" />
+        <p><b className="text-txt">NPC profiles &amp; social actions:</b> tap any family card to open that character's profile, then scroll to Interactions for talk, gifts, dates, and other available actions.</p>
+      </div>
       <section>
         <SectionTitle icon="heart">Parents</SectionTitle>
         <div className="grid sm:grid-cols-2 gap-2">

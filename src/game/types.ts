@@ -97,19 +97,64 @@ export interface UniInfo {
   gpa: number; // 0..100
 }
 
+export interface SportCareer {
+  sportId: string;
+  level: "school" | "amateur" | "professional" | "retired";
+  years: number;
+  experience: number;
+  salary: number;
+  wins: number;
+  losses: number;
+  competitions: number;
+  lastCompetitionYear?: number;
+  awards: string[];
+  achievements: string[];
+  injuryUntil?: number;
+  injury?: string;
+  sponsorshipIncome?: number;
+}
+
+export type FamePathway = "acting" | "modelling" | "music";
+export interface FameCareer {
+  pathway: FamePathway;
+  level: number;
+  experience: number;
+  projects: number;
+  lastProjectYear?: number;
+  agency?: string;
+  portfolio?: number;
+  releases?: number;
+  annualIncome?: number;
+  awards: string[];
+}
+
+export type ThemePreference = "auto" | "classic" | "gold";
+
 export interface Char {
   id: string;
   firstName: string;
   lastName: string;
-  /** Cultural naming group id (see name-data.ts). */
+  /** Cultural naming group id (see name-data.ts); not an ethnicity or nationality. */
   group?: string;
+  /** Current residence; retained as the legacy country field. */
+  countryId: string;
+  /** Birthplace remains fixed when a character migrates. */
+  birthCountryId?: string;
+  birthCity?: string;
+  /** Cultural group connections inherited from family; intentionally not inferred as ethnicity. */
+  culturalHeritage?: string[];
+  /** Explicit ethnicity labels only when supplied; never inferred from a name or language. */
+  ethnicities?: string[];
+  /** Legacy single citizenship plus the full set of citizenships. */
+  citizenships?: string[];
+  /** Household/community exposure is tracked separately from language proficiency. */
+  languageExposure?: Record<string, number>;
   gender: Gender;
   birthYear: number;
   age: number;
   alive: boolean;
   deathYear?: number;
   causeOfDeath?: string;
-  countryId: string;
   city: string;
   isPlayer: boolean;
   generation: number;
@@ -143,6 +188,13 @@ export interface Char {
   retired: boolean;
   languages: Record<string, number>;
   skills: Record<string, number>;
+  skillLastPractice?: Record<string, number>;
+  /** Per-skill learning multipliers, rolled only when a character begins that skill. */
+  aptitudes?: Record<string, number>;
+  sportsCareer?: SportCareer;
+  fame?: number;
+  reputation?: number;
+  fameCareer?: FameCareer;
   flags: string[];
   milestones: { year: number; age: number; text: string }[];
   usedActions: string[];
@@ -195,6 +247,7 @@ export interface GameState {
   over: boolean;
   overText?: string;
   toast?: Toast | null;
+  themePreference?: ThemePreference;
   nameUsage: NameUsage;
   /** Save slot this life is bound to (set by the persistence layer). */
   saveSlotId?: string;
@@ -227,6 +280,8 @@ export interface LifeEvent {
   when?: (e: EventCtx) => boolean;
   text: (e: EventCtx) => string;
   choices?: (e: EventCtx) => ChoiceDef[];
+  /** Optional data-driven proficiency outcomes for event choices. */
+  skillEffects?: { skillId: string; choice?: string; effort?: number }[];
   run: (e: EventCtx, choice?: string) => void;
 }
 
@@ -240,6 +295,13 @@ export interface ParentSpec {
   firstName: string;
   age: number;
   alive: boolean;
+  /** Explicit optional self/family description; never inferred from cultural group. */
+  ethnicity?: string;
+  /** Family origin/birth country; independent of residence and citizenship. */
+  countryId?: string;
+  /** Citizenship(s) can differ from family origin; not inferred from cultural group. */
+  citizenships?: string[];
+  culturalGroupId?: string;
 }
 
 export interface CustomSpec {
@@ -248,6 +310,8 @@ export interface CustomSpec {
   gender: Gender;
   countryId: string;
   group?: string;
+  /** Optional explicit ethnicity entry; not derived from group or nationality. */
+  ethnicity?: string;
   city: string; // empty string => random
   birthYear?: number; // empty/undefined => random within era limits
   traits: string[];

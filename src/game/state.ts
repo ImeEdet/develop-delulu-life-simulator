@@ -5,6 +5,10 @@ import { ageUp, continueAs, getEvent } from "./simulate";
 import { runEvent } from "./events";
 import { doAction } from "./actions";
 import { interactWithNpc, type NpcInteraction } from "./social";
+import { practiceSkill } from "./skills";
+import { performSportAction, type SportAction } from "./sports";
+import { performFameAction, type FameAction } from "./fame";
+import type { ThemePreference } from "./types";
 import { getDriver, type StorageDriver } from "./persistence/storage";
 import {
   AUTOSAVE_ID, deleteSlot, exportEnvelope, importEnvelope, listSlots, loadSlot,
@@ -124,6 +128,11 @@ export function useGame() {
     [commit]
   );
 
+  const practice = useCallback((skillId: string) => commit((s) => practiceSkill(s, skillId)), [commit]);
+  const sport = useCallback((sportId: string, action: SportAction) => commit((s) => performSportAction(s, sportId, action)), [commit]);
+  const fame = useCallback((action: FameAction) => commit((s) => performFameAction(s, action)), [commit]);
+  const setThemePreference = useCallback((preference: ThemePreference) => commit((s) => { s.themePreference = preference; }), [commit]);
+
   const cont = useCallback((id: string) => commit((s) => continueAs(s, id)), [commit]);
 
   const dismissToast = useCallback(() => commit((s) => (s.toast = null)), [commit]);
@@ -184,8 +193,8 @@ export function useGame() {
 
   const endLineage = useCallback(() => setState(null), []);
 
-  const quickSave = useCallback(() => {
-    if (state) void persist(state);
+  const quickSave = useCallback(async () => {
+    if (state) await persist(state);
   }, [state, persist]);
 
   return {
@@ -198,6 +207,10 @@ export function useGame() {
     resolve,
     act,
     interactNpc,
+    practice,
+    sport,
+    fame,
+    setThemePreference,
     cont,
     dismissToast,
     openSlot,

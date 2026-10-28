@@ -85,6 +85,7 @@ export const tests = [
       const p = state.chars[state.currentId];
       assert(p.loans.length === 1 && p.loans[0].balance === 5000, "V1 debt not converted to a loan");
       assert(!!p.group && !!p.citizenOf, "group/citizenship backfill failed");
+      assert(p.culturalHeritage?.includes(p.group), "legacy cultural heritage fallback failed");
       assertEqual(state.version, 2, "version bumped");
     },
   },

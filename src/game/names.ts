@@ -103,7 +103,9 @@ export function rollGender(): Gender {
 
 /** Convention-aware display name (Korea/Japan put the family name first). */
 export function fullName(c: Char): string {
-  const group = groupFor(c.countryId, c.group);
+  // A mixed-heritage child may keep a parent naming group that is not one of
+  // the current residence country's defaults; preserve that convention.
+  const group = (c.group ? NAME_GROUPS[c.group] : undefined) ?? groupFor(c.countryId, c.group);
   if (group.order === "last-first") return `${c.lastName} ${c.firstName}`.trim();
   return `${c.firstName} ${c.lastName}`.trim();
 }

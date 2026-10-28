@@ -9,6 +9,8 @@ import { Journal } from "./Journal";
 import { FamilyScreen, MoneyScreen, WorkScreen } from "./Screens";
 import { ActionsScreen, ProfileScreen } from "./Screens2";
 import { NpcProfile } from "./NpcProfile";
+import { SkillsScreen, SportsScreen, FameScreen } from "./Screens3";
+import { isGoldTheme } from "../game/fame";
 
 const TABS = [
   { id: "life", label: "Life", icon: "feather" },
@@ -16,6 +18,9 @@ const TABS = [
   { id: "work", label: "Work", icon: "briefcase" },
   { id: "money", label: "Money", icon: "coin" },
   { id: "actions", label: "Actions", icon: "spark" },
+  { id: "skills", label: "Skills", icon: "bulb" },
+  { id: "sports", label: "Sports", icon: "pulse" },
+  { id: "fame", label: "Fame", icon: "star" },
   { id: "you", label: "You", icon: "star" },
 ];
 
@@ -26,9 +31,10 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
   const [npcId, setNpcId] = useState<string | null>(null);
   const c = country(p.countryId);
   const pending = s.pending[0];
+  const goldTheme = isGoldTheme(p, s.themePreference ?? "auto");
 
   return (
-    <div className="relative min-h-screen bg-dusk">
+    <div className={`relative min-h-screen bg-dusk ${goldTheme ? "theme-gold" : ""}`}>
       <div className="stars" />
       <div className="relative z-10 max-w-2xl mx-auto px-3 sm:px-4 pb-28">
         {/* Header */}
@@ -96,7 +102,10 @@ export function Game({ g, onMenu }: { g: GameApi; onMenu: () => void }) {
           {tab === "work" && <WorkScreen s={s} g={g} />}
           {tab === "money" && <MoneyScreen s={s} g={g} />}
           {tab === "actions" && <ActionsScreen s={s} g={g} />}
-          {tab === "you" && <ProfileScreen s={s} />}
+          {tab === "skills" && <SkillsScreen s={s} g={g} />}
+          {tab === "sports" && <SportsScreen s={s} g={g} />}
+          {tab === "fame" && <FameScreen s={s} g={g} />}
+          {tab === "you" && <ProfileScreen s={s} g={g} />}
         </main>
       </div>
 

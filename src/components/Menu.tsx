@@ -231,6 +231,18 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
             />
           </div>
           <div>
+            <label className="text-[11px] font-extrabold uppercase tracking-wider text-dim block mb-1">Ethnicity (optional, self-described)</label>
+            <input
+              type="text"
+              value={spec.ethnicity ?? ""}
+              maxLength={60}
+              onChange={(e) => set({ ethnicity: e.target.value })}
+              className="w-full bg-ink border border-line rounded-lg px-3 py-2.5 text-sm focus:border-peach"
+              placeholder="Leave blank if you prefer not to specify"
+            />
+            <p className="text-[10px] text-dim mt-1">This is kept separate from cultural tradition, citizenship, and language.</p>
+          </div>
+          <div>
             <label className="text-[11px] font-extrabold uppercase tracking-wider text-dim block mb-1">Gender</label>
             <div className="grid grid-cols-2 gap-2">
               {(["female", "male"] as Gender[]).map((gd) => (
@@ -365,6 +377,17 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
                         className="w-full bg-ink border border-line rounded-md px-2.5 py-1.5 text-sm font-bold focus:border-peach"
                         placeholder={label}
                       />
+                      <label className="block text-[11px] font-bold text-dim">
+                        Ethnicity (optional, self-described)
+                        <input
+                          type="text"
+                          value={par.ethnicity ?? ""}
+                          maxLength={60}
+                          onChange={(e) => upd({ ethnicity: e.target.value })}
+                          className="mt-1 w-full bg-ink border border-line rounded-md px-2.5 py-2 text-sm text-txt"
+                          placeholder="Not inferred from background"
+                        />
+                      </label>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
@@ -375,6 +398,55 @@ function CustomFlow({ g: _g, onBack, onBegin }: { g: GameApi; onBack: () => void
                           className="w-20 bg-ink border border-line rounded-md px-2.5 py-1.5 text-sm font-bold focus:border-peach"
                         />
                         <span className="text-dim text-xs">years old at your birth</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        <label className="text-[11px] font-bold text-dim">
+                          Family origin country
+                          <select
+                            value={par.countryId ?? spec.countryId}
+                            onChange={(e) => {
+                              const parentCountry = country(e.target.value);
+                              upd({ countryId: parentCountry.id, culturalGroupId: parentCountry.groups[0] });
+                            }}
+                            className="mt-1 w-full bg-ink border border-line rounded-md px-2.5 py-2 text-sm text-txt"
+                          >
+                            {COUNTRY_LIST.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-[11px] font-bold text-dim">
+                          Cultural tradition
+                          <select
+                            value={par.culturalGroupId ?? groupsForCountry(par.countryId ?? spec.countryId)[0]?.id ?? spec.group}
+                            onChange={(e) => upd({ culturalGroupId: e.target.value })}
+                            className="mt-1 w-full bg-ink border border-line rounded-md px-2.5 py-2 text-sm text-txt"
+                          >
+                            {groupsForCountry(par.countryId ?? spec.countryId).map((heritage) => <option key={heritage.id} value={heritage.id}>{heritage.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-[11px] font-bold text-dim">
+                          Citizenship
+                          <select
+                            value={par.citizenships?.[0] ?? par.countryId ?? spec.countryId}
+                            onChange={(e) => upd({ citizenships: [e.target.value, ...(par.citizenships?.[1] ? [par.citizenships[1]] : [])] })}
+                            className="mt-1 w-full bg-ink border border-line rounded-md px-2.5 py-2 text-sm text-txt"
+                          >
+                            {COUNTRY_LIST.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-[11px] font-bold text-dim">
+                          Additional citizenship (optional)
+                          <select
+                            value={par.citizenships?.[1] ?? ""}
+                            onChange={(e) => {
+                              const primary = par.citizenships?.[0] ?? par.countryId ?? spec.countryId;
+                              upd({ citizenships: [primary, ...(e.target.value && e.target.value !== primary ? [e.target.value] : [])] });
+                            }}
+                            className="mt-1 w-full bg-ink border border-line rounded-md px-2.5 py-2 text-sm text-txt"
+                          >
+                            <option value="">None specified</option>
+                            {COUNTRY_LIST.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
+                          </select>
+                        </label>
                       </div>
                       <label className="flex items-center gap-2 text-xs font-bold text-dim cursor-pointer">
                         <input type="checkbox" checked={par.alive} onChange={(e) => upd({ alive: e.target.checked })} className="accent-[#5ce8a9]" />
