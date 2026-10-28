@@ -1,8 +1,10 @@
 import React from "react";
+import { readFileSync } from "node:fs";
 import { renderToString } from "react-dom/server";
 import App from "../../src/App";
 import { Menu } from "../../src/components/Menu";
 import { Game } from "../../src/components/Game";
+import { UpdateBanner } from "../../src/components/UpdateBanner";
 import { setSeed } from "../../src/game/rng";
 import { newRandomLife } from "../../src/game/characters";
 import type { GameApi } from "../../src/game/state";
@@ -63,6 +65,22 @@ export const tests = [
       assert(html.includes("Family") && html.includes("Money") && html.includes("Actions"), "tabs missing");
       const p = g.state!.chars[g.state!.currentId];
       assert(html.includes(p.firstName), "character name missing from header");
+    },
+  },
+  {
+    name: "service-worker update prompt shows an accessible restart button only when rendered",
+    fn: () => {
+      const html = renderToString(React.createElement(UpdateBanner, { updating: false, onUpdate: () => {} }));
+      assert(html.includes('role="status"') && html.includes("A new Delulu Life update is ready."), "update notice missing");
+      assert(html.includes("Update &amp; restart"), "restart action is not visible");
+    },
+  },
+  {
+    name: "service worker waits for the in-app update command instead of silently replacing the session",
+    fn: () => {
+      const worker = readFileSync("public/sw.js", "utf8");
+      assert(worker.includes('event.data?.type === "SKIP_WAITING"'), "worker does not handle the update button command");
+      assert(!worker.includes("then(() => self.skipWaiting())"), "worker still applies updates without user action");
     },
   },
   {

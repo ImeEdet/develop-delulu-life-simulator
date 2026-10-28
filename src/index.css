@@ -221,3 +221,49 @@ nav::-webkit-scrollbar {
     font-size: 3.4rem;
   }
 }
+
+
+/* Fame-threshold palette: warm black, amber, and champagne. The classic theme remains the default. */
+.theme-gold {
+  --color-ink: #17130e;
+  --color-ink2: #211b12;
+  --color-ink3: #302518;
+  --color-ink4: #42331d;
+  --color-line: #5a482d;
+  --color-txt: #fff4dc;
+  --color-dim: #c8b78f;
+  --color-pink: #dda95b;
+  --color-peach: #f0c36b;
+  --color-mint: #dfc078;
+  --color-lav: #d2ad72;
+  --color-coral: #e48e62;
+  --color-gold: #ffe1a0;
+}
+.theme-gold.bg-dusk {
+  background:
+    radial-gradient(1100px 700px at 88% -10%, rgba(240, 195, 107, 0.14), transparent 60%),
+    radial-gradient(900px 650px at -12% 35%, rgba(223, 192, 120, 0.08), transparent 55%),
+    radial-gradient(1000px 900px at 50% 115%, rgba(210, 173, 114, 0.12), transparent 62%);
+}
+.theme-gold .stars {
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%, rgba(255, 244, 220, 0.55) 50%, transparent 51%),
+    radial-gradient(1px 1px at 28% 68%, rgba(240, 195, 107, 0.4) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 42% 12%, rgba(255, 225, 160, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 58% 42%, rgba(255, 244, 220, 0.35) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 71% 18%, rgba(221, 169, 91, 0.45) 50%, transparent 51%),
+    radial-gradient(1px 1px at 84% 58%, rgba(255, 244, 220, 0.45) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 8% 84%, rgba(255, 225, 160, 0.4) 50%, transparent 51%);
+}
+.theme-gold .panel-inset { background: rgba(33, 27, 18, 0.76); }
+.theme-gold .btn-primary {
+  background: linear-gradient(135deg, #f0c36b, #dda95b);
+  color: #21180c;
+  box-shadow: 0 6px 22px rgba(240, 195, 107, 0.24);
+}
+.theme-gold .anim-glow { animation-name: gold-glowpulse; }
+@keyframes gold-glowpulse {
+  0%, 100% { box-shadow: 0 6px 28px rgba(221, 169, 91, 0.28), 0 0 0 rgba(240, 195, 107, 0); }
+  50% { box-shadow: 0 10px 42px rgba(240, 195, 107, 0.38), 0 0 24px rgba(221, 169, 91, 0.2); }
+}
+.theme-gold .btn-ghost:hover:not(:disabled) { border-color: #b28b4d; }

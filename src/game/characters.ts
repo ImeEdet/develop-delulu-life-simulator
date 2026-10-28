@@ -19,16 +19,6 @@ export function genSurname(culture: string): string {
   return makeSurname("us", null, legacyGroupId(culture));
 }
 
-/** Heritage language associated with a naming group, if any. */
-const GROUP_LANG: Record<string, string> = {
-  yoruba: "yoruba",
-  hausa: "hausa",
-  igbo: "igbo",
-  "tamil-south": "tamil",
-  bengali: "bengali",
-  punjabi: "punjabi",
-};
-
 function mkChar(s: GameState, part: Partial<Char>): Char {
   const id = `c${s.seq++}`;
   const c: Char = {
@@ -60,13 +50,30 @@ function mkChar(s: GameState, part: Partial<Char>): Char {
     job: null,
     retired: false,
     languages: {},
+    languageExposure: {},
     skills: {},
+    skillLastPractice: {},
+    aptitudes: {},
+    fame: 0,
+    reputation: 50,
     flags: [],
     milestones: [],
     usedActions: [],
     eventCooldowns: {},
     ...part,
   };
+  c.birthCountryId ??= part.birthCountryId ?? c.countryId;
+  c.birthCity ??= part.birthCity ?? c.city;
+  c.culturalHeritage = [...(part.culturalHeritage ?? (c.group ? [c.group] : []))];
+  c.ethnicities = [...(part.ethnicities ?? [])];
+  c.citizenships = [...(part.citizenships ?? [c.citizenOf ?? c.countryId])];
+  c.languages = { ...(part.languages ?? c.languages) };
+  c.skills = { ...(part.skills ?? c.skills) };
+  c.languageExposure = { ...(part.languageExposure ?? Object.fromEntries(Object.entries(c.languages).map(([language, level]) => [language, Math.round(level * 0.6)]))) };
+  c.skillLastPractice = { ...(part.skillLastPractice ?? {}) };
+  c.aptitudes = { ...(part.aptitudes ?? {}) };
+  c.fame ??= 0;
+  c.reputation ??= 50;
   s.chars[id] = c;
   return c;
 }
@@ -145,10 +152,12 @@ export function buildRandomSpec(): CustomSpec {
   const c = pick(COUNTRY_LIST);
   const gender = rollGender();
   const group = pick(c.groups);
+  const motherGroup = pick(c.groups);
+  const fatherGroup = c.groups.length > 1 && chance(0.35) ? pick(c.groups.filter((id) => id !== motherGroup)) : motherGroup;
   const r = random();
   const tier = r < 0.14 ? 0 : r < 0.5 ? 1 : r < 0.82 ? 2 : r < 0.95 ? 3 : 4;
-  const mother = { firstName: makeFirstName(c.id, "female", group), age: ri(24, 42), alive: chance(0.93) };
-  const father = { firstName: makeFirstName(c.id, "male", group), age: ri(26, 44), alive: chance(0.9) };
+  const mother = { firstName: makeFirstName(c.id, "female", motherGroup), age: ri(24, 42), alive: chance(0.93), countryId: c.id, culturalGroupId: motherGroup };
+  const father = { firstName: makeFirstName(c.id, "male", fatherGroup), age: ri(26, 44), alive: chance(0.9), countryId: c.id, culturalGroupId: fatherGroup };
   const sc = random();
   const sibCount = sc < 0.45 ? 0 : sc < 0.75 ? 1 : sc < 0.9 ? 2 : 3;
   const siblings = Array.from({ length: sibCount }, () => {
@@ -198,6 +207,7 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
     seq: 1,
     livesLived: prevLives,
     over: false,
+    themePreference: "auto",
     nameUsage: { first: {}, last: {}, recent: [] },
   };
   const L = (kind: GameState["log"][number]["kind"], text: string) =>
@@ -217,14 +227,19 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
     gender: spec.gender,
     birthYear: startYear,
     countryId: c.id,
+    birthCountryId: c.id,
+    birthCity: city,
+    culturalHeritage: [...new Set([spec.mother?.culturalGroupId, spec.father?.culturalGroupId].filter((x): x is string => !!x))],
+    ethnicities: spec.ethnicity?.trim() ? [spec.ethnicity.trim()] : [],
+    citizenships: [...new Set([c.id, ...(spec.mother?.citizenships ?? [spec.mother?.countryId]), ...(spec.father?.citizenships ?? [spec.father?.countryId])].filter((x): x is string => !!x))],
+    languageExposure: { [c.languages[0]]: 60, ...(c.languages[1] ? { [c.languages[1]]: 20 } : {}) },
     city,
     isPlayer: true,
     wealthTier: spec.wealthTier,
     traits: spec.traits.length >= 2 ? spec.traits.slice(0, 2) : [...spec.traits, pick(TRAIT_LIST).id],
     languages: {
-      [c.languages[0]]: 55,
-      ...(c.languages[1] ? { [c.languages[1]]: 25 } : {}),
-      ...(GROUP_LANG[groupId] && !c.languages.includes(GROUP_LANG[groupId]) ? { [GROUP_LANG[groupId]]: 35 } : {}),
+      [c.languages[0]]: 5,
+      ...(c.languages[1] ? { [c.languages[1]]: 2 } : {}),
     },
     citizenOf: c.id,
     milestones: [{ year: startYear, age: 0, text: `Born in ${city}` }],
@@ -238,24 +253,34 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
     const gender: Gender = kind === "mother" ? "female" : "male";
     const maxAge = kind === "mother" ? 50 : 65;
     const age = clamp(ps.age, 16, maxAge);
+    const originCountry = country(ps.countryId ?? c.id);
+    const parentGroupId = ps.culturalGroupId && originCountry.groups.includes(ps.culturalGroupId) ? ps.culturalGroupId : originCountry.groups[0];
+    const parentLanguage = originCountry.languages[0];
+    const residenceLanguage = c.languages[0];
     const par = mkChar(s, {
-      firstName: customOrGenerated(ps.firstName, c.id, gender, groupId, usage),
+      firstName: customOrGenerated(ps.firstName, originCountry.id, gender, parentGroupId, usage),
       // The mother always carries the family name so children inherit it
       // consistently; an apart father keeps his own independent surname.
       lastName:
         kind === "mother" || spec.parentStatus === "together"
           ? familySurname
-          : makeSurname(c.id, gender, groupId, usage),
-      group: groupId,
+          : makeSurname(originCountry.id, gender, parentGroupId, usage),
+      group: parentGroupId,
       gender,
       age,
       birthYear: startYear - age,
       alive: ps.alive,
       countryId: c.id,
+      birthCountryId: originCountry.id,
+      birthCity: pick(originCountry.cities),
+      culturalHeritage: [parentGroupId],
+      ethnicities: ps.ethnicity?.trim() ? [ps.ethnicity.trim()] : [],
+      citizenships: ps.citizenships?.length ? [...ps.citizenships] : [originCountry.id],
       city,
       wealthTier: tier,
-      citizenOf: c.id,
-      languages: { [c.languages[0]]: 85, ...(GROUP_LANG[groupId] ? { [GROUP_LANG[groupId]]: 60 } : {}) },
+      citizenOf: ps.citizenships?.[0] ?? originCountry.id,
+      languageExposure: { [parentLanguage]: 75, [residenceLanguage]: 55 },
+      languages: { [residenceLanguage]: 75, ...(parentLanguage !== residenceLanguage && chance(0.35) ? { [parentLanguage]: ri(25, 60) } : {}) },
     });
     if (!par.alive) {
       par.deathYear = startYear - ri(1, 4);
@@ -266,6 +291,14 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
   };
   const mother = makeParent("mother");
   const father = makeParent("father");
+  player.culturalHeritage = [...new Set([groupId, ...(mother?.culturalHeritage ?? []), ...(father?.culturalHeritage ?? [])])];
+  player.citizenships = [...new Set([c.id, ...(mother?.citizenships ?? []), ...(father?.citizenships ?? [])])];
+  for (const parent of [mother, father]) {
+    if (!parent) continue;
+    for (const [language, exposure] of Object.entries(parent.languageExposure ?? {})) {
+      player.languageExposure![language] = Math.max(player.languageExposure![language] ?? 0, Math.round(exposure * 0.35));
+    }
+  }
 
   const together = spec.parentStatus === "together" && !!mother?.alive && !!father?.alive;
   if (mother) {
@@ -291,12 +324,18 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
       age,
       birthYear: startYear - age,
       countryId: c.id,
+      birthCountryId: c.id,
+      birthCity: city,
+      culturalHeritage: player.culturalHeritage,
+      ethnicities: [...(mother?.ethnicities ?? []), ...(father?.ethnicities ?? [])],
+      citizenships: player.citizenships,
+      languageExposure: { ...(player.languageExposure ?? {}) },
       city,
       wealthTier: tier,
       motherId: mother?.id,
       fatherId: father?.id,
       citizenOf: c.id,
-      languages: { [c.languages[0]]: 70 },
+      languages: { [c.languages[0]]: 5 },
     });
     npcLifeSetup(sc, startYear);
     if (mother) mother.childrenIds.push(sc.id);
@@ -305,14 +344,21 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
 
   if (mother && chance(0.5)) {
     const age = ri(58, 78);
+    const originCountry = country(mother.birthCountryId ?? c.id);
+    const heritageGroup = mother.group ?? originCountry.groups[0];
     const gm = mkChar(s, {
-      firstName: makeFirstName(c.id, "female", groupId, usage),
+      firstName: makeFirstName(originCountry.id, "female", heritageGroup, usage),
       lastName: mother.lastName,
-      group: groupId,
+      group: heritageGroup,
       gender: "female",
       age,
       birthYear: startYear - age,
       countryId: c.id,
+      birthCountryId: originCountry.id,
+      birthCity: pick(originCountry.cities),
+      culturalHeritage: mother.culturalHeritage,
+      citizenships: mother.citizenships,
+      citizenOf: mother.citizenOf,
       city,
     });
     gm.childrenIds.push(mother.id);
@@ -320,14 +366,21 @@ export function newCustomLife(spec: CustomSpec, prevLives: number): GameState {
   }
   if (father && chance(0.5)) {
     const age = ri(60, 80);
+    const originCountry = country(father.birthCountryId ?? c.id);
+    const heritageGroup = father.group ?? originCountry.groups[0];
     const gf = mkChar(s, {
-      firstName: makeFirstName(c.id, "male", groupId, usage),
+      firstName: makeFirstName(originCountry.id, "male", heritageGroup, usage),
       lastName: father.lastName,
-      group: groupId,
+      group: heritageGroup,
       gender: "male",
       age,
       birthYear: startYear - age,
       countryId: c.id,
+      birthCountryId: originCountry.id,
+      birthCity: pick(originCountry.cities),
+      culturalHeritage: father.culturalHeritage,
+      citizenships: father.citizenships,
+      citizenOf: father.citizenOf,
       city,
     });
     gf.childrenIds.push(father.id);
@@ -363,7 +416,8 @@ export function createChild(s: GameState, mother: Char, father: Char, originCoun
   const groupId = mother.group && father.group && mother.group !== father.group && chance(0.5)
     ? father.group
     : mother.group ?? father.group ?? country(mother.countryId).groups[0];
-  const identity = makeIdentity(mother.countryId, gender, {
+  const nameCountry = COUNTRY_LIST.find((ct) => ct.groups.includes(groupId)) ?? country(mother.countryId);
+  const identity = makeIdentity(nameCountry.id, gender, {
     groupId,
     usage: s.nameUsage,
     surname: mother.lastName,
@@ -376,6 +430,12 @@ export function createChild(s: GameState, mother: Char, father: Char, originCoun
     age: 0,
     birthYear: s.worldYear,
     countryId: mother.countryId,
+    birthCountryId: origin?.id ?? mother.countryId,
+    birthCity: origin ? pick(origin.cities) : mother.city,
+    culturalHeritage: [...new Set([...(mother.culturalHeritage ?? []), ...(father.culturalHeritage ?? []), ...(mother.group ? [mother.group] : []), ...(father.group ? [father.group] : [])])],
+    ethnicities: [...new Set([...(mother.ethnicities ?? []), ...(father.ethnicities ?? [])])],
+    citizenships: [...new Set([...(mother.citizenships ?? [mother.citizenOf ?? mother.countryId]), ...(father.citizenships ?? [father.citizenOf ?? father.countryId])])],
+    languageExposure: {},
     city: mother.city,
     // Genealogical depth: a child belongs one generation below the deeper of
     // the two parental lines. Outsiders created as partners are gen 1, so the
@@ -389,10 +449,24 @@ export function createChild(s: GameState, mother: Char, father: Char, originCoun
   const cty = country(mother.countryId);
   const mNative = cty.languages[0];
   const fNative = country(father.countryId).languages[0];
-  child.languages[mNative] = 55;
-  if (fNative !== mNative) child.languages[fNative] = 50;
+  child.languages[mNative] = 5;
+  child.languageExposure![mNative] = 60;
+  if (fNative !== mNative) {
+    child.languages[fNative] = 2;
+    child.languageExposure![fNative] = 25;
+  }
+  for (const parent of [mother, father]) {
+    for (const [language, proficiency] of Object.entries(parent.languages)) {
+      if (proficiency >= 25) {
+        child.languageExposure![language] = Math.max(child.languageExposure![language] ?? 0, Math.round(proficiency * 0.65));
+        if (language !== mNative && language !== fNative) child.languages[language] = Math.max(child.languages[language] ?? 0, 2);
+      }
+    }
+  }
   if (origin) {
-    child.languages[origin.languages[0]] = 60;
+    const originLanguage = origin.languages[0];
+    child.languageExposure![originLanguage] = Math.max(child.languageExposure![originLanguage] ?? 0, 30);
+    child.languages[originLanguage] = Math.max(child.languages[originLanguage] ?? 0, 2);
     child.flags.push("adopted");
   }
   if (!mother.childrenIds.includes(child.id)) mother.childrenIds.push(child.id);

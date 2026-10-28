@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type { Char, GameState } from "../game/types";
 import type { GameApi } from "../game/state";
 import { fullName } from "../game/names";
-import { country, fmtMoney } from "../game/world";
+import { country, fmtMoney, LANGS } from "../game/world";
 import { JOBS, MAJOR_LIST, SENIORITY, TRAIT_LIST } from "../game/content";
 import { netWorth, totalDebt } from "../game/economy";
 import { relLabel } from "../game/characters";
+import { NAME_GROUPS } from "../game/name-data";
+import { SPORT_BY_ID } from "../game/sports";
+import { SKILL_BY_ID } from "../game/skills";
 import { npcInteractionOptions, npcInteractionLock, npcRelationshipScore } from "../game/social";
 import type { NpcInteraction } from "../game/social";
 import { Chip, CountryTag, I, Portrait, SectionTitle } from "./ui";
@@ -126,7 +129,8 @@ export function NpcProfile({ s, g, targetId, onClose }: NpcProfileProps) {
   const education = educationLabel(c);
   const occupation = occupationLabel(c);
   const debt = totalDebt(c);
-  const income = c.job?.salary ?? (c.retired ? c.pension : 0);
+  const income = (c.job?.salary ?? (c.retired ? c.pension : 0)) + (c.sportsCareer?.level === "professional" ? c.sportsCareer.salary + (c.sportsCareer.sponsorshipIncome ?? 0) : 0) + (c.fameCareer?.annualIncome ?? 0);
+  const skills = Object.entries(c.skills).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const showFinances = c.alive && (c.age >= 18 || c.money !== 0 || debt > 0);
   const actions = npcInteractionOptions(s, c.id);
 
@@ -195,6 +199,28 @@ export function NpcProfile({ s, g, targetId, onClose }: NpcProfileProps) {
             </section>
           )}
 
+          {c.alive && actions.length > 0 && (
+            <section className="panel p-3">
+              <SectionTitle icon="heart">Interactions</SectionTitle>
+              <p className="text-[11px] text-dim mb-2">Social actions are ready here; each has its own availability and yearly limit.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {actions.map((action) => {
+                  const cost = action.cost === undefined ? null : fmtMoney(action.cost, player.countryId);
+                  const disabled = !!action.disabledReason;
+                  return (
+                    <button key={action.id} type="button" disabled={disabled} onClick={() => doInteraction(action.id)} className="btn-ghost min-h-14 rounded-xl px-3 py-2.5 text-left disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-peach">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-sm">{action.label}</span>
+                        {cost && <span className="text-xs text-gold shrink-0">{cost}</span>}
+                      </span>
+                      <span className="block text-xs text-dim mt-1">{action.disabledReason ?? action.detail}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {traits.length > 0 && (
             <section>
               <SectionTitle icon="spark">Traits</SectionTitle>
@@ -210,6 +236,21 @@ export function NpcProfile({ s, g, targetId, onClose }: NpcProfileProps) {
               {(occupation || c.job?.employer) && <div className="panel-inset p-3"><p className="text-xs text-dim font-bold uppercase tracking-wide">Occupation</p><p className="text-sm font-bold mt-1">{occupation ?? "Occupation unavailable"}</p>{c.job?.employer && <p className="text-xs text-dim mt-1 break-words">{c.job.employer}</p>}</div>}
             </section>
           )}
+
+          <section className="panel-inset p-3 space-y-3">
+            <div><SectionTitle icon="globe">Background</SectionTitle><div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <p><span className="text-dim">Born in </span><b>{c.birthCity ?? c.city}, {country(c.birthCountryId ?? c.countryId).name}</b></p>
+              <p><span className="text-dim">Lives in </span><b>{c.city}, {country(c.countryId).name}</b></p>
+              <div className="sm:col-span-2"><span className="text-dim">Cultural connections: </span>{(c.culturalHeritage ?? []).map((id) => NAME_GROUPS[id]?.name ?? id).join(", ") || "Not recorded"}</div>
+              <div className="sm:col-span-2"><span className="text-dim">Self-described ethnicity: </span>{(c.ethnicities ?? []).join(", ") || "Not specified"}</div>
+              <div className="sm:col-span-2"><span className="text-dim">Citizenship: </span>{(c.citizenships ?? [c.citizenOf ?? c.countryId]).map((id) => country(id).name).join(", ")}</div>
+              <div className="sm:col-span-2"><span className="text-dim">Languages: </span>{Object.entries(c.languages).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).map(([id, value]) => `${LANGS[id]?.name ?? id} (${Math.round(value)})`).join(", ") || "Not recorded"}</div>
+              <div className="sm:col-span-2 text-[10px] text-dim"><span className="font-bold">Family/community exposure: </span>{Object.entries(c.languageExposure ?? {}).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).map(([id, value]) => `${LANGS[id]?.name ?? id} (${Math.round(value)})`).join(", ") || "Not recorded"} · exposure is not fluency.</div>
+            </div></div>
+            {(c.fame ?? 0) > 0 && <div><div className="flex items-center justify-between text-xs"><span className="font-bold">Fame</span><b>{Math.round(c.fame ?? 0)}/100</b></div><div className="flex items-center justify-between text-xs mt-1"><span className="font-bold">Reputation</span><b>{Math.round(c.reputation ?? 50)}/100</b></div>{c.fameCareer && <p className="text-[11px] text-dim mt-1 capitalize">{c.fameCareer.pathway} · level {c.fameCareer.level}</p>}</div>}
+            {c.sportsCareer && <div><p className="text-xs font-bold">{SPORT_BY_ID[c.sportsCareer.sportId]?.name ?? c.sportsCareer.sportId} · {c.sportsCareer.level}</p><p className="text-[11px] text-dim mt-1">{c.sportsCareer.wins} wins · {c.sportsCareer.losses} losses · {c.sportsCareer.awards.length} awards</p>{c.sportsCareer.injury && <p className="text-[11px] text-coral mt-1">{c.sportsCareer.injury}</p>}</div>}
+            {skills.length > 0 && <div><p className="text-xs font-bold mb-1">Skills</p><div className="flex flex-wrap gap-1.5">{skills.map(([id, value]) => <Chip key={id} color="dim" title={`${Math.round(value)}/100`}>{SKILL_BY_ID[id]?.name ?? id} · {Math.round(value)}</Chip>)}</div></div>}
+          </section>
 
           {(parents.length > 0 || siblings.length > 0 || partner || children.length > 0) && (
             <section>
@@ -231,27 +272,6 @@ export function NpcProfile({ s, g, targetId, onClose }: NpcProfileProps) {
                 <div className="panel-inset p-3"><p className="text-xs text-dim">Net worth</p><p className="text-sm font-bold tabular-nums break-words">{fmtMoney(netWorth(c), c.countryId)}</p></div>
                 {income > 0 && <div className="panel-inset p-3"><p className="text-xs text-dim">Income / year</p><p className="text-sm font-bold tabular-nums break-words">{fmtMoney(income, c.countryId)}</p></div>}
                 {debt > 0 && <div className="panel-inset p-3"><p className="text-xs text-dim">Debt</p><p className="text-sm font-bold text-coral tabular-nums break-words">{fmtMoney(debt, c.countryId)}</p></div>}
-              </div>
-            </section>
-          )}
-
-          {c.alive && actions.length > 0 && (
-            <section>
-              <SectionTitle icon="heart">Interactions</SectionTitle>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {actions.map((action) => {
-                  const cost = action.cost === undefined ? null : fmtMoney(action.cost, player.countryId);
-                  const disabled = !!action.disabledReason;
-                  return (
-                    <button key={action.id} type="button" disabled={disabled} onClick={() => doInteraction(action.id)} className="btn-ghost min-h-14 rounded-xl px-3 py-2.5 text-left disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-peach">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="font-bold text-sm">{action.label}</span>
-                        {cost && <span className="text-xs text-gold shrink-0">{cost}</span>}
-                      </span>
-                      <span className="block text-xs text-dim mt-1">{action.disabledReason ?? action.detail}</span>
-                    </button>
-                  );
-                })}
               </div>
             </section>
           )}

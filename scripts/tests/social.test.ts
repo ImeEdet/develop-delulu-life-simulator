@@ -148,10 +148,12 @@ export const tests = [
       const parentId = s.chars[s.currentId].motherId ?? s.chars[s.currentId].fatherId;
       assert(parentId, "fixture has no parent NPC");
       const familyMarkup = renderToStaticMarkup(createElement(FamilyScreen, { s, onSelectNpc: () => {} }));
+      assert(familyMarkup.includes("NPC profiles &amp; social actions") && familyMarkup.includes(">Profile</span>"), "mobile family view does not make NPC profiles discoverable");
       const parent = s.chars[parentId];
       assert(familyMarkup.includes(`View ${parent.firstName} ${parent.lastName}, mother, profile`) || familyMarkup.includes(`View ${parent.firstName} ${parent.lastName}, father, profile`), "family card was not an accessible button for its NPC ID");
       const profileMarkup = renderToStaticMarkup(createElement(NpcProfile, { s, g: {} as GameApi, targetId: friend.id, onClose: () => {} }));
       assert(profileMarkup.includes('role="dialog"') && /id="npc-profile-title"[^>]*>/.test(profileMarkup) && profileMarkup.includes(fullName(friend)), "selected ID did not render the requested character profile");
+      assert(profileMarkup.includes("npc-profile-sheet") && profileMarkup.indexOf("Interactions") < profileMarkup.indexOf("Background"), "V2.5 social actions are buried below the visible profile details on mobile");
       friend.alive = false;
       const deadMarkup = renderToStaticMarkup(createElement(NpcProfile, { s, g: {} as GameApi, targetId: friend.id, onClose: () => {} }));
       assert(deadMarkup.includes("This profile is read-only.") && !deadMarkup.includes("Interactions</h3>"), "deceased profile was not read-only");

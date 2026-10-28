@@ -7,6 +7,7 @@ import {
 import { clamp, createChild, pick } from "./characters";
 import { nominalSalary } from "./economy";
 import { random } from "./rng";
+import { developSkill } from "./skills";
 
 export function makeCtx(s: GameState, p: Char): EventCtx {
   const rnd = random;
@@ -31,6 +32,9 @@ export function makeCtx(s: GameState, p: Char): EventCtx {
 export function runEvent(s: GameState, p: Char, ev: LifeEvent, choice?: string) {
   const e = makeCtx(s, p);
   ev.run(e, choice);
+  for (const effect of ev.skillEffects ?? []) {
+    if (!effect.choice || effect.choice === choice) developSkill(p, effect.skillId, effect.effort ?? 0.45, s.worldYear);
+  }
   // Event penalties must never leave a wallet below zero.
   p.money = Math.max(0, Math.round(p.money));
   if (ev.once && !p.flags.includes(ev.id)) p.flags.push(ev.id);
@@ -371,6 +375,7 @@ export const EVENTS: LifeEvent[] = [
       { id: "family", label: "Draw the family" },
       { id: "abstract", label: "Pure feeling, no notes" },
     ],
+    skillEffects: [{ skillId: "painting", effort: 0.7 }],
     run: (e, choice) => {
       if (choice === "family") {
         st(e, "happiness", 3);
@@ -414,6 +419,10 @@ export const EVENTS: LifeEvent[] = [
       { id: "grab", label: "Get the swing back" },
       { id: "leave", label: "Walk away, dignified" },
     ],
+    skillEffects: [
+      { skillId: "communication", choice: "trade", effort: 0.7 },
+      { skillId: "negotiation", choice: "trade", effort: 0.4 },
+    ],
     run: (e, choice) => {
       if (choice === "trade") {
         st(e, "happiness", 4);
@@ -435,9 +444,10 @@ export const EVENTS: LifeEvent[] = [
       { id: "perform", label: "Perform", hint: "Whatever that is. Now." },
       { id: "hide", label: "Hide in the audience" },
     ],
+    skillEffects: [{ skillId: "acting", choice: "perform", effort: 0.8 }, { skillId: "communication", choice: "perform", effort: 0.35 }],
     run: (e, choice) => {
       if (choice === "perform") {
-        if (e.chance(0.5 + e.p.looks / 300)) {
+        if (e.chance(clamp(0.4 + e.p.looks / 300 + (e.p.skills.acting ?? 0) / 400, 0.1, 0.88))) {
           st(e, "happiness", 8);
           e.p.milestones.push({ year: e.s.worldYear, age: e.p.age, text: "Talent show star" });
           e.log("good", "You performed. The applause was real, the applause was loud, and somebody's parent actually cried.");
@@ -539,9 +549,10 @@ export const EVENTS: LifeEvent[] = [
       { id: "lead", label: "Try out for the lead" },
       { id: "chorus", label: "Join the chorus (the safe one)" },
     ],
+    skillEffects: [{ skillId: "acting", choice: "lead", effort: 0.8 }, { skillId: "singing", choice: "chorus", effort: 0.7 }],
     run: (e, choice) => {
       if (choice === "lead") {
-        if (e.chance(0.4 + e.p.smarts / 250 + e.p.looks / 400)) {
+        if (e.chance(clamp(0.3 + e.p.smarts / 300 + e.p.looks / 400 + (e.p.skills.acting ?? 0) / 350, 0.08, 0.88))) {
           st(e, "happiness", 6);
           e.p.milestones.push({ year: e.s.worldYear, age: e.p.age, text: "Star of the school play" });
           e.log("good", "You got the lead. The curtain call felt like a small, personal ceremony.");
@@ -621,6 +632,11 @@ export const EVENTS: LifeEvent[] = [
       { id: "chill", label: "Balance it. Maybe." },
       { id: "sick", label: "Fake sick on exam day", hint: "Bold. Detectable." },
     ],
+    skillEffects: [
+      { skillId: "mathematics", choice: "grind", effort: 0.9 },
+      { skillId: "writing", choice: "grind", effort: 0.7 },
+      { skillId: "mathematics", choice: "chill", effort: 0.3 },
+    ],
     run: (e, choice) => {
       if (choice === "grind") {
         st(e, "smarts", 4);
@@ -649,6 +665,7 @@ export const EVENTS: LifeEvent[] = [
       { id: "drums", label: "Drums (the chaos)" },
       { id: "leave", label: "Watch from the curb" },
     ],
+    skillEffects: [{ skillId: "instruments", choice: "guitar", effort: 1 }, { skillId: "instruments", choice: "drums", effort: 0.8 }],
     run: (e, choice) => {
       if (choice === "guitar") {
         e.p.flags.push("band");
