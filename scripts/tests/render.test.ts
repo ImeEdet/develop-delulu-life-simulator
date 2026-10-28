@@ -7,7 +7,7 @@ import { Game } from "../../src/components/Game";
 import { UpdateBanner } from "../../src/components/UpdateBanner";
 import { setSeed } from "../../src/game/rng";
 import { newRandomLife } from "../../src/game/characters";
-import { hasWaitingUpdate } from "../../src/game/useAppUpdate";
+import { hasWaitingUpdate, shouldCheckForUpdate, UPDATE_POLL_INTERVAL_MS } from "../../src/game/useAppUpdate";
 import type { GameApi } from "../../src/game/state";
 import { assert } from "./util";
 
@@ -82,6 +82,7 @@ export const tests = [
       const html = renderToString(React.createElement(UpdateBanner, { updating: false, onUpdate: () => {} }));
       assert(html.includes('role="status"') && html.includes("A new Delulu Life update is ready."), "update notice missing");
       assert(html.includes("Update &amp; restart"), "restart action is not visible");
+      assert(html.includes("min-h-11"), "update action is below a comfortable mobile touch target");
     },
   },
   {
@@ -89,10 +90,20 @@ export const tests = [
     fn: () => {
       assert(hasWaitingUpdate({ waiting: {} as ServiceWorker }), "waiting update was hidden without a page controller");
       assert(!hasWaitingUpdate({ waiting: null }), "empty registration incorrectly shows an update");
+      assert(shouldCheckForUpdate(true, true), "foreground online app should check for updates");
+      assert(!shouldCheckForUpdate(false, true), "background app should defer periodic checks");
+      assert(!shouldCheckForUpdate(true, false), "offline app should avoid network polling");
+      assert(UPDATE_POLL_INTERVAL_MS === 60_000, "foreground polling should be once per minute");
       const hook = readFileSync("src/game/useAppUpdate.ts", "utf8");
       assert(hook.includes('window.addEventListener("pageshow", checkForUpdate)'), "page restore does not check for updates");
       assert(hook.includes('window.addEventListener("online", checkForUpdate)'), "coming online does not check for updates");
-      assert(hook.includes("15 * 60 * 1000"), "update polling interval is missing or too long");
+      assert(hook.includes("UPDATE_POLL_INTERVAL_MS"), "update interval constant is not used by the poller");
+      assert(hook.includes("navigator.onLine"), "polling is not guarded by online status");
+      assert(hook.includes('document.addEventListener("visibilitychange", checkForUpdate)'), "foreground return does not check immediately");
+      const app = readFileSync("src/App.tsx", "utf8");
+      const css = readFileSync("src/index.css", "utf8");
+      assert(app.includes("has-update-banner"), "content is not offset beneath the fixed banner");
+      assert(css.includes("env(safe-area-inset-top"), "banner layout ignores mobile safe areas");
     },
   },
   {

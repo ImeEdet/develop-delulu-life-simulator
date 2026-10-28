@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/** Check often while the app is foregrounded; mobile browsers throttle background timers. */
+export const UPDATE_POLL_INTERVAL_MS = 60_000;
+
+export function shouldCheckForUpdate(isVisible: boolean, isOnline: boolean): boolean {
+  return isVisible && isOnline;
+}
+
 export interface AppUpdateState {
   updateAvailable: boolean;
   updating: boolean;
@@ -32,6 +39,7 @@ export function useAppUpdate(): AppUpdateState {
     let reloading = false;
 
     const revealWaitingWorker = () => {
+      if (disposed) return;
       if (hasWaitingUpdate(activeRegistration)) {
         waitingWorkerDetected = true;
         setUpdateAvailable(true);
@@ -51,7 +59,7 @@ export function useAppUpdate(): AppUpdateState {
       // Surface an already-waiting worker immediately, even when offline or when
       // the current browser page is not yet controlled by the registration.
       revealWaitingWorker();
-      if (document.visibilityState !== "visible" || !activeRegistration) return;
+      if (!shouldCheckForUpdate(document.visibilityState === "visible", navigator.onLine) || !activeRegistration) return;
       void activeRegistration.update().then(revealWaitingWorker).catch(() => undefined);
     };
     const onControllerChange = () => {
@@ -84,7 +92,10 @@ export function useAppUpdate(): AppUpdateState {
       next.addEventListener("updatefound", onInstalling);
       if (next.installing) onInstalling();
       checkForUpdate();
-      interval = window.setInterval(checkForUpdate, 15 * 60 * 1000);
+      // Foreground online checks keep installed Android/iOS apps from needing a
+      // manual refresh. Background timers are throttled by mobile browsers;
+      // pageshow/visibilitychange/focus check immediately when users return.
+      interval = window.setInterval(checkForUpdate, UPDATE_POLL_INTERVAL_MS);
     }).catch((error) => {
       console.warn("Delulu Life: service worker registration failed", error);
     });

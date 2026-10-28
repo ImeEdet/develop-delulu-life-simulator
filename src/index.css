@@ -159,6 +159,11 @@ input[type="range"] {
   }
 }
 
+/* Keep page content clear of the fixed update notice and iOS/Android safe area. */
+.has-update-banner {
+  padding-top: calc(6rem + env(safe-area-inset-top, 0px));
+}
+
 /* ---- PWA / notched-phone safe areas ---- */
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-bottom {

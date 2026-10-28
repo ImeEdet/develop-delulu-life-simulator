@@ -8,7 +8,7 @@ export function UpdateBanner({ updating, onUpdate }: { updating: boolean; onUpda
           type="button"
           onClick={onUpdate}
           disabled={updating}
-          className="btn-primary min-h-10 rounded-lg px-3 py-2 text-xs font-extrabold disabled:opacity-60"
+          className="btn-primary min-h-11 rounded-lg px-3 py-2 text-xs font-extrabold disabled:opacity-60"
         >
           {updating ? "Restarting…" : "Update & restart"}
         </button>
